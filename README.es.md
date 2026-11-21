@@ -200,7 +200,7 @@ netflow → EDR → SIEM):
 `opencode-go` conectado.
 
 ```bash
-git clone https://github.com/TU-USUARIO/logscope.git
+git clone https://github.com/jorge-hacks/LogScope.git
 cd logscope
 
 # venv con uv (o con pip: python -m venv .venv && . .venv/bin/activate)
@@ -391,7 +391,7 @@ documentado de extremo a extremo, incluida la **ejecución de Snort 3.12.2**
 sobre una captura reconstruida a partir de los registros CSV, que corrobora al
 segundo las detecciones del firewall.
 
-👉 [Material completo de la evaluación](https://github.com/TU-USUARIO/evau2-logscope)
+👉 [Material completo de la evaluación](https://github.com/jorge-hacks/evau2-logscope)
 (informe, reglas del IDS, evidencia y scripts de reproducción)
 
 
