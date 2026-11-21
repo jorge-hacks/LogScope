@@ -47,6 +47,18 @@ async function loadData() {
   badge.textContent = meta.severity || 'INFO';
   badge.className = `badge ${meta.severity || 'INFO'}`;
 
+  const runBadge = document.getElementById('run-badge');
+  const runStatus = (data.run && data.run.status) || meta.status || 'idle';
+  runBadge.textContent = runStatus;
+  runBadge.className = `badge ${runStatus === 'done' ? 'ok' : (runStatus === 'running' ? 'running' : (runStatus === 'error' ? 'failed' : 'pending'))}`;
+
+  const runButton = document.getElementById('run-btn');
+  if (runButton) {
+    const busy = runStatus === 'running';
+    runButton.disabled = busy;
+    runButton.textContent = busy ? 'Analizando...' : 'Ejecutar analisis';
+  }
+
   const sources = Object.entries(metrics.by_source || {});
   const select = document.getElementById('f-source');
   sources.forEach(([name, count]) => {
@@ -61,6 +73,7 @@ async function loadData() {
     renderReport(report);
   }
   renderIntegrity(integrity);
+  renderState(data);
 }
 
 async function loadTimeline() {
@@ -134,6 +147,52 @@ function renderIntegrity(integrity) {
     .map((s) => `${s.ip}: ${s.users.join(', ')}`));
 
   container.innerHTML = blocks.length ? blocks.join('') : '<div class="empty">Sin incidencias de calidad.</div>';
+}
+
+/* ------------------------------------------------------------------ estado */
+function renderState(data) {
+  const banner = document.getElementById('state-banner');
+  if (!banner) return;
+  const run = data.run || {};
+  const hasReport = Boolean(data.report);
+  const meta = data.meta || {};
+
+  banner.classList.remove('hide', 'warn', 'err', 'ok');
+
+  if (run.status === 'running') {
+    if (hasReport) {
+      banner.classList.add('ok');
+      banner.innerHTML = `<b>Informe ya disponible</b> (severidad `
+        + `<b>${LS.escape((data.report && data.report.severity_overall) || 'INFO')}</b>). `
+        + `El agente sigue afinandolo; la vista se actualizara sola.`;
+    } else {
+      banner.classList.add('warn');
+      banner.innerHTML = `<span class="spinner"></span> <b>Analisis en curso</b> con el modelo `
+        + `<code>${LS.escape(run.model || '')}</code>. El agente esta leyendo los logs; `
+        + `puede tardar varios minutos. Las pestañas de hallazgos se rellebaran al terminar.`;
+    }
+    return;
+  }
+  if (run.status === 'error') {
+    banner.classList.add('err');
+    banner.innerHTML = `<b>El analisis termino con error:</b> ${LS.escape(run.error || 'sin detalle')}`
+      + `<br>Puedes volver a lanzarlo con el boton de arriba.`;
+    return;
+  }
+  if (!hasReport) {
+    banner.classList.add('warn');
+    banner.innerHTML = `<b>Todavia no hay informe.</b> Los ${meta.events || 0} eventos ya estan `
+      + `indexados y las metricas calculadas, pero los hallazgos, el mapeo ATT&amp;CK, la revision `
+      + `de las reglas SIEM y los IOCs los genera el agente de opencode: pulsa `
+      + `<b>Ejecutar analisis</b>.`;
+    return;
+  }
+  if (meta.status === 'done') {
+    banner.classList.add('ok');
+    const modelo = meta.model ? ` por <code>${LS.escape(meta.model)}</code>` : '';
+    banner.innerHTML = `Informe generado${modelo}. Severidad global `
+      + `<b>${LS.escape(meta.severity || 'INFO')}</b>.`;
+  }
 }
 
 /* ---------------------------------------------------------------- informe */
@@ -276,6 +335,12 @@ async function runAnalysis() {
   source.addEventListener('warning', (event) => {
     const data = JSON.parse(event.data);
     write('warn', `! ${data.text}`);
+  });
+  source.addEventListener('report', async (event) => {
+    const data = JSON.parse(event.data);
+    write('ok', `> ${data.text}`);
+    // El informe ya es valido: se recargan los datos para pintarlo.
+    await loadData();
   });
   source.addEventListener('error', (event) => {
     try {

@@ -81,6 +81,7 @@ class Settings:
         default_factory=lambda: (PROJECT_ROOT / _env("LOGSCOPE_WORKSPACES", "workspaces")).resolve()
     )
     max_upload_mb: int = field(default_factory=lambda: _env_int("LOGSCOPE_MAX_UPLOAD_MB", 64))
+    analysis_timeout: int = field(default_factory=lambda: _env_int("LOGSCOPE_ANALYSIS_TIMEOUT", 900))
     log_level: str = field(default_factory=lambda: _env("LOG_LEVEL", "INFO"))
 
     presets_file: Path = field(default_factory=lambda: PROJECT_ROOT / "config" / "presets.json")

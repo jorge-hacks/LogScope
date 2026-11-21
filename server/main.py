@@ -76,6 +76,7 @@ class NoCacheStaticFiles(StaticFiles):
 async def lifespan(app: FastAPI):
     """Arranca y para el servidor headless de opencode junto a la aplicacion."""
     settings.workspaces_dir.mkdir(parents=True, exist_ok=True)
+    reconcile_pending_analyses()
     try:
         await manager.ensure_running()
     except OpencodeError as exc:
@@ -176,6 +177,50 @@ def load_meta(analysis_id: str) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="Metadatos corruptos") from None
+
+
+def reconcile_pending_analyses() -> list[str]:
+    """Recupera analisis interrumpidos.
+
+    Si el proceso se reinicia (o el turno del agente se cuelga) mientras el
+    informe ya estaba escrito y validado, el estado se queda en 'pending' y el
+    analisis aparece como si no se hubiera hecho. Al arrancar se reconcilia:
+    si el informe existe y valida, el analisis se marca como terminado.
+    """
+    recovered: list[str] = []
+    if not settings.workspaces_dir.exists():
+        return recovered
+    for directory in sorted(settings.workspaces_dir.iterdir()):
+        if not directory.is_dir() or directory.name.startswith("."):
+            continue
+        meta_path = directory / "analysis.json"
+        report_path = directory / "report" / "report.json"
+        if not meta_path.exists() or not report_path.exists():
+            continue
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if meta.get("status") not in {"pending", "running"}:
+            continue
+        try:
+            report = Report.model_validate(json.loads(report_path.read_text(encoding="utf-8")))
+        except (json.JSONDecodeError, ValidationError):
+            continue
+        meta.update(
+            {
+                "status": "done",
+                "severity": report.severity_overall,
+                "findings": len(report.findings),
+                "phases": len(report.attack_chain),
+                "iocs": len(report.iocs),
+            }
+        )
+        meta_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+        recovered.append(directory.name)
+    if recovered:
+        print(f"[logscope] informes recuperados de analisis interrumpidos: {len(recovered)}")
+    return recovered
 
 
 # ---------------------------------------------------------------------------
@@ -566,6 +611,77 @@ async def _consume_events(client: OpencodeClient, directory: str, state: RunStat
         await _emit(state, "warning", {"text": f"stream cerrado: {exc}"})
 
 
+async def _poll_report(
+    root: Path,
+    state: RunState,
+    analysis_id: str,
+    model: str,
+    session_id: str,
+) -> None:
+    """Publica el informe en cuanto existe y valida, sin esperar al turno.
+
+    El agente escribe report.json y despues sigue refinandolo. Si se espera
+    al final del turno, un turno lento (o colgado) deja un informe valido sin
+    publicar. Sondeando el fichero, el resultado aparece nada mas se escribe.
+    """
+    report_path = root / "report" / "report.json"
+    published = ""
+    while True:
+        if report_path.exists():
+            report = None
+            try:
+                report = Report.model_validate(json.loads(report_path.read_text(encoding="utf-8")))
+            except (json.JSONDecodeError, ValidationError, OSError):
+                report = None
+            if report is not None:
+                digest = hashlib.sha1(
+                    json.dumps(report.to_dict(), sort_keys=True, default=str).encode()
+                ).hexdigest()
+                if digest != published:
+                    published = digest
+                    (report_path).write_text(
+                        json.dumps(report.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8"
+                    )
+                    _store_report_meta(analysis_id, report, model=model, session_id=session_id)
+                    await _emit(
+                        state,
+                        "report",
+                        {
+                            "text": (
+                                f"Informe disponible: {len(report.findings)} hallazgos, "
+                                f"{len(report.attack_chain)} fases, {len(report.iocs)} IOCs"
+                            ),
+                            "severity": report.severity_overall,
+                            "findings": len(report.findings),
+                        },
+                    )
+        await asyncio.sleep(4)
+
+
+async def _send_with_timeout(
+    client: OpencodeClient,
+    session_id: str,
+    text: str,
+    model: str,
+    agent: str,
+    timeout: float,
+) -> str:
+    """Envia un mensaje con limite de tiempo.
+
+    Un turno puede quedarse colgado (por ejemplo, una llamada a herramienta
+    que nunca se resuelve). Sin este limite el analisis se queda esperando
+    para siempre y el informe, aunque ya este escrito, nunca se publica.
+    """
+    try:
+        await asyncio.wait_for(
+            client.send_message(session_id, text, model=model, agent=agent),
+            timeout=timeout,
+        )
+    except TimeoutError:
+        return "timeout"
+    return "ok"
+
+
 async def _run_analysis(analysis_id: str, requested_model: str, agent: str) -> None:
     state = RUNS[analysis_id]
     state.status = "running"
@@ -608,14 +724,30 @@ async def _run_analysis(analysis_id: str, requested_model: str, agent: str) -> N
             await _emit(state, "status", {"text": f"Sesion {session_id} | modelo {chosen}"})
 
             consumer = asyncio.create_task(_consume_events(client, str(root), state, session_id))
+            poller = asyncio.create_task(_poll_report(root, state, analysis_id, chosen, session_id))
             try:
                 prompt = _build_prompt(analysis_id, root, metrics, integrity)
                 await _emit(state, "status", {"text": "Enviando peticion de analisis..."})
-                await client.send_message(session_id, prompt, model=chosen, agent=agent)
+                outcome = await _send_with_timeout(
+                    client, session_id, prompt, chosen, agent, settings.analysis_timeout
+                )
+                if outcome == "timeout":
+                    await _emit(
+                        state,
+                        "warning",
+                        {
+                            "text": (
+                                f"El turno del agente no termino en {settings.analysis_timeout:.0f}s. "
+                                "Se comprueba si el informe ya esta escrito."
+                            )
+                        },
+                    )
             finally:
                 consumer.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await consumer
+                poller.cancel()
+                for task in (consumer, poller):
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await task
 
             # --- validacion del informe -------------------------------------
             report_path = root / "report" / "report.json"
@@ -623,17 +755,35 @@ async def _run_analysis(analysis_id: str, requested_model: str, agent: str) -> N
                 if not report_path.exists():
                     if attempt == 0:
                         await _emit(state, "warning", {"text": "El agente no genero report.json; se le repregunta."})
-                        await client.send_message(
+                        await _send_with_timeout(
+                            client,
                             session_id,
                             "No se encontro report.json en el workspace. Escribelo ahora respetando el "
                             "esquema exacto de la skill log-forensics.",
-                            model=chosen,
-                            agent=agent,
+                            chosen,
+                            agent,
+                            settings.analysis_timeout,
                         )
                         continue
                     raise OpencodeError("El agente no genero report.json")
 
-                raw = json.loads(report_path.read_text(encoding="utf-8"))
+                try:
+                    raw = json.loads(report_path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError as exc:
+                    if attempt == 0:
+                        await _emit(state, "warning", {"text": f"report.json esta corrupto: {exc}"})
+                        await _send_with_timeout(
+                            client,
+                            session_id,
+                            "El fichero report.json esta corrupto. Reescribelo respetando el esquema "
+                            "exacto de la skill log-forensics.",
+                            chosen,
+                            agent,
+                            settings.analysis_timeout,
+                        )
+                        continue
+                    raise OpencodeError(f"report.json sigue sin ser valido: {exc}") from exc
+
                 try:
                     report = Report.model_validate(raw)
                 except ValidationError as exc:
@@ -642,18 +792,30 @@ async def _run_analysis(analysis_id: str, requested_model: str, agent: str) -> N
                             f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors()[:12]
                         )
                         await _emit(state, "warning", {"text": f"report.json no valida: {problems[:600]}"})
-                        await client.send_message(
+                        await _send_with_timeout(
+                            client,
                             session_id,
                             f"report.json no valida contra el esquema. Corrige estos errores y reescribe el "
                             f"fichero: {problems}",
-                            model=chosen,
-                            agent=agent,
+                            chosen,
+                            agent,
+                            settings.analysis_timeout,
                         )
                         continue
                     raise OpencodeError(f"report.json sigue sin validar: {problems}") from exc
 
                 (root / "report" / "report.json").write_text(
                     json.dumps(report.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8"
+                )
+                # El estado se persiste en cuanto el informe es valido: si el
+                # proceso se reinicia despues, el analisis sigue siendo visible
+                # como terminado y no se pierde el trabajo del agente.
+                _store_report_meta(
+                    analysis_id,
+                    report,
+                    model=chosen,
+                    session_id=session_id,
+                    status="done",
                 )
                 state.status = "done"
                 await _emit(
@@ -666,19 +828,6 @@ async def _run_analysis(analysis_id: str, requested_model: str, agent: str) -> N
                     },
                 )
                 break
-
-            meta = load_meta(analysis_id)
-            meta.update(
-                {
-                    "status": "done",
-                    "model": chosen,
-                    "session_id": session_id,
-                    "severity": report.severity_overall,
-                    "findings": len(report.findings),
-                    "phases": len(report.attack_chain),
-                }
-            )
-            save_meta(analysis_id, meta)
 
     except ModelUnavailable as exc:
         state.status = "error"
@@ -694,6 +843,36 @@ async def _run_analysis(analysis_id: str, requested_model: str, agent: str) -> N
         await _emit(state, "error", {"text": state.error})
     finally:
         await state.queue.put(None)
+
+
+def _store_report_meta(
+    analysis_id: str,
+    report: Report,
+    model: str = "",
+    session_id: str = "",
+    status: str = "done",
+) -> dict[str, Any]:
+    """Persiste en analysis.json el resultado del analisis."""
+    meta_path = workspace_path(analysis_id) / "analysis.json"
+    meta: dict[str, Any] = {}
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            meta = {}
+    meta.update(
+        {
+            "status": status,
+            "model": model or meta.get("model", ""),
+            "session_id": session_id or meta.get("session_id", ""),
+            "severity": report.severity_overall,
+            "findings": len(report.findings),
+            "phases": len(report.attack_chain),
+            "iocs": len(report.iocs),
+        }
+    )
+    save_meta(analysis_id, meta)
+    return meta
 
 
 @app.post("/api/analysis/{analysis_id}/analyze")
