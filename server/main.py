@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import csv
+import hashlib
 import io
 import json
 import shutil
@@ -44,6 +45,33 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 
 
+def _asset_version() -> str:
+    """Huella corta del contenido de static/, para invalidar la cache.
+
+    Sin esto, el navegador puede seguir sirviendo un JS viejo (por ejemplo
+    tras corregir un bug) y la interfaz queda a medio actualizar sin que
+    haya ningun error visible en consola.
+    """
+    digest = hashlib.sha1()
+    for path in sorted(STATIC_DIR.rglob("*")):
+        if path.is_file():
+            stat = path.stat()
+            digest.update(f"{path.relative_to(STATIC_DIR)}:{stat.st_size}:{int(stat.st_mtime)}".encode())
+    return digest.hexdigest()[:10]
+
+
+ASSET_VERSION = _asset_version()
+
+
+class NoCacheStaticFiles(StaticFiles):
+    """Sirve los estaticos indicando siempre que se revaliden."""
+
+    def file_response(self, *args, **kwargs):  # type: ignore[override]
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Arranca y para el servidor headless de opencode junto a la aplicacion."""
@@ -62,8 +90,19 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates.env.globals["asset"] = lambda path: f"{path}?v={ASSET_VERSION}"
+
+
+@app.middleware("http")
+async def no_cache_html(request: Request, call_next):
+    """Las paginas nunca se cachean: si no, el usuario puede ver HTML viejo
+    que apunte a scripts que ya no existen."""
+    response = await call_next(request)
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 
 # ---------------------------------------------------------------------------

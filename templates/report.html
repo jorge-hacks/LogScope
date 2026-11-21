@@ -18,34 +18,37 @@
 <div class="card mt-2">
   <div class="md-report" id="md-body">
     {% if report %}
-      <div id="report-json" hidden>{{ report }}</div>
-      {% if markdown_text %}
-        <div id="markdown-source" hidden>{{ markdown_text }}</div>
-      {% endif %}
+      <div id="report-json" hidden>{{ report | tojson }}</div>
+      {% if markdown_text %}<div id="markdown-source" hidden>{{ markdown_text }}</div>{% endif %}
       <div class="empty">Renderizando el informe...</div>
     {% else %}
       <div class="empty">Todavia no hay informe para este analisis.</div>
     {% endif %}
   </div>
 </div>
+
+{% if markdown_text %}
+<div class="card">
+  <div class="card-head">
+    <h2>Markdown original</h2>
+    <span class="card-sub">tal cual lo escribio el agente</span>
+  </div>
+  <pre class="console" style="max-height:520px;white-space:pre-wrap">{{ markdown_text }}</pre>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
 <script>
-  (async function () {
-    const body = document.getElementById('md-body');
-    const source = document.getElementById('markdown-source');
-    if (source) {
-      const text = source.textContent;
-      if (window.marked) body.innerHTML = marked.parse(text);
-      return;
-    }
-    const holder = document.getElementById('report-json');
-    if (!holder) return;
+  (function () {
+    var body = document.getElementById('md-body');
+    var holder = document.getElementById('report-json');
+    if (!body || !holder) return;
     try {
-      const report = JSON.parse(holder.textContent);
-      renderReport(body, report);
+      // Se usa el renderizador propio (app.js), que escapa todo el contenido.
+      // Nada de HTML sin sanear: el informe contiene texto que viene de los
+      // logs y un atacante podria controlarlo.
+      window.LS.renderReport(body, JSON.parse(holder.textContent));
     } catch (err) {
       body.innerHTML = '<div class="empty">No se pudo representar el informe.</div>';
     }

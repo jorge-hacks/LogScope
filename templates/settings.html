@@ -49,5 +49,5 @@
 <script>
   window.LOGSCOPE = Object.assign(window.LOGSCOPE || {}, { provider: "{{ provider }}" });
 </script>
-<script src="/static/js/settings.js"></script>
+<script src="{{ asset("/static/js/settings.js") }}"></script>
 {% endblock %}
