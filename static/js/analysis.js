@@ -1,6 +1,6 @@
 /* LogScope - logica de la pagina de analisis */
 
-const LS = window.LOGSCOPE;
+var LS = window.LOGSCOPE;
 const analysisId = LS.analysisId;
 
 let eventsOffset = 0;

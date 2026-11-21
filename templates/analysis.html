@@ -207,11 +207,11 @@
 
 {% block scripts %}
 <script>
-  window.LOGSCOPE = {
+  window.LOGSCOPE = Object.assign(window.LOGSCOPE || {}, {
     analysisId: "{{ meta.id }}",
     defaultModel: "{{ default_model }}",
     provider: "{{ provider }}"
-  };
+  });
 </script>
 <script src="/static/js/analysis.js"></script>
 {% endblock %}

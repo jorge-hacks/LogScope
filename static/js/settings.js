@@ -1,6 +1,6 @@
 /* LogScope - editor de presets */
 
-const LS = window.LOGSCOPE;
+var LS = window.LOGSCOPE;
 let catalog = { models: [], presets: [], meta: {} };
 
 function modelOptions() {

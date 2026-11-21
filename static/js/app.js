@@ -1,6 +1,6 @@
 /* LogScope - utilidades compartidas */
 
-const LS = (window.LOGSCOPE = window.LOGSCOPE || {});
+var LS = (window.LOGSCOPE = window.LOGSCOPE || {});
 
 LS.api = async function (url, options = {}) {
   const response = await fetch(url, options);

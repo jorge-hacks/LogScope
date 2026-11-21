@@ -111,3 +111,13 @@
   </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+  window.LOGSCOPE = Object.assign(window.LOGSCOPE || {}, {
+    defaultModel: "{{ default_model }}",
+    provider: "{{ provider }}"
+  });
+</script>
+<script src="/static/js/index.js"></script>
+{% endblock %}

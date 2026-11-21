@@ -47,7 +47,7 @@
 
 {% block scripts %}
 <script>
-  window.LOGSCOPE = { provider: "{{ provider }}" };
+  window.LOGSCOPE = Object.assign(window.LOGSCOPE || {}, { provider: "{{ provider }}" });
 </script>
 <script src="/static/js/settings.js"></script>
 {% endblock %}
