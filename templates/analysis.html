@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}LogScope - {{ meta.name }}{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block content %}
+<div class="spread">
+  <div>
+    <div class="row row-tight">
+      <a href="/" class="btn btn-ghost btn-sm">&larr; Analisis</a>
+      <span class="badge {{ meta.severity }}" id="sev-badge">{{ meta.severity }}</span>
+      <span class="badge" id="run-badge">{{ meta.status }}</span>
+    </div>
+    <h1 class="mt-1">{{ meta.name }}</h1>
+    <div class="row row-tight small muted">
+      <span>{{ meta.events }} eventos</span><span>&middot;</span>
+      <span>{{ meta.files }} ficheros</span><span>&middot;</span>
+      <span class="mono">{{ meta.created_at[:19].replace('T', ' ') }}</span>
+      {% if meta.model %}<span>&middot;</span><span class="mono">{{ meta.model }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="row row-tight">
+    <select id="model-select" style="width:230px"></select>
+    <button class="btn btn-primary" id="run-btn">Ejecutar analisis</button>
+    <a class="btn btn-ghost" id="export-md" href="/api/analysis/{{ meta.id }}/export/md">Markdown</a>
+    <a class="btn btn-ghost" id="export-pdf" href="/api/analysis/{{ meta.id }}/export/pdf">PDF</a>
+    <a class="btn btn-ghost" href="/api/analysis/{{ meta.id }}/export/events.csv">Eventos CSV</a>
+    <a class="btn btn-ghost" href="/api/analysis/{{ meta.id }}/export/findings.csv">Hallazgos CSV</a>
+    <a class="btn btn-ghost" id="export-md-report" href="/analysis/{{ meta.id }}/report">Informe</a>
+  </div>
+</div>
+
+<div class="grid grid-4 mt-2" id="stat-row">
+  <div class="stat"><div class="stat-label">Eventos</div><div class="stat-value" id="s-events">-</div><div class="stat-note" id="s-events-note">&nbsp;</div></div>
+  <div class="stat"><div class="stat-label">MTTD mediano</div><div class="stat-value" id="s-mttd">-</div><div class="stat-note" id="s-mttd-note">&nbsp;</div></div>
+  <div class="stat"><div class="stat-label">Permanencia</div><div class="stat-value" id="s-dwell">-</div><div class="stat-note" id="s-dwell-note">&nbsp;</div></div>
+  <div class="stat"><div class="stat-label">Fuera de horario</div><div class="stat-value" id="s-night">-</div><div class="stat-note" id="s-night-note">&nbsp;</div></div>
+</div>
+
+<div class="card hide" id="run-panel">
+  <div class="card-head">
+    <h2>Ejecucion del analisis</h2>
+    <span class="card-sub" id="run-model"></span>
+  </div>
+  <div class="console" id="console"></div>
+</div>
+
+<div class="tabs mt-2" id="tabs">
+  <button class="tab active" data-tab="timeline">Cronologia</button>
+  <button class="tab" data-tab="events">Eventos <span class="count" id="c-events">0</span></button>
+  <button class="tab" data-tab="findings">Hallazgos <span class="count" id="c-findings">0</span></button>
+  <button class="tab" data-tab="attack">ATT&amp;CK <span class="count" id="c-attack">0</span></button>
+  <button class="tab" data-tab="siem">Reglas SIEM <span class="count" id="c-siem">0</span></button>
+  <button class="tab" data-tab="iocs">IOCs <span class="count" id="c-iocs">0</span></button>
+  <button class="tab" data-tab="gaps">Telemetria</button>
+  <button class="tab" data-tab="chat">Chat</button>
+</div>
+
+<!-- ------------------------------------------------------------- timeline -->
+<div class="tab-panel active" id="panel-timeline">
+  <div class="card">
+    <div class="card-head">
+      <h2>Distribucion temporal</h2>
+      <div class="legend">
+        <span><i style="background:var(--critical)"></i> CRITICAL</span>
+        <span><i style="background:var(--high)"></i> HIGH</span>
+        <span><i style="background:var(--medium)"></i> MEDIUM</span>
+        <span><i style="background:var(--low)"></i> LOW</span>
+        <span><i style="background:var(--info)"></i> INFO</span>
+      </div>
+    </div>
+    <div class="chart" id="chart-timeline"></div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Actividad por hora</h2><span class="card-sub">00:00 - 23:59</span></div>
+      <div class="chart" id="chart-hours"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Fases del incidente</h2><span class="card-sub" id="chain-count"></span></div>
+      <div id="chain"><div class="empty">Ejecuta el analisis para reconstruir la cadena de ataque.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------------- events -->
+<div class="tab-panel" id="panel-events">
+  <div class="card">
+    <div class="card-head">
+      <h2>Eventos normalizados</h2>
+      <div class="row row-tight">
+        <select id="f-source" style="width:170px"><option value="">todas las fuentes</option></select>
+        <select id="f-severity" style="width:150px">
+          <option value="">toda severidad</option>
+          <option value="CRITICAL">CRITICAL</option>
+          <option value="HIGH">HIGH</option>
+          <option value="MEDIUM">MEDIUM</option>
+          <option value="LOW">LOW</option>
+          <option value="INFO">INFO</option>
+        </select>
+        <label class="checkbox"><input type="checkbox" id="f-night"> fuera de horario</label>
+        <input type="text" id="f-query" placeholder="buscar..." style="width:190px">
+      </div>
+    </div>
+    <div class="table-wrap" style="max-height:620px;overflow-y:auto">
+      <table id="events-table">
+        <thead><tr>
+          <th>Timestamp</th><th>Fuente</th><th>ID</th><th>Severidad</th>
+          <th>Actor</th><th>Origen</th><th>Destino</th><th>Tipo</th><th>Detalle</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="spread mt-1 small muted">
+      <span id="events-count"></span>
+      <button class="btn btn-sm" id="events-more">Cargar mas</button>
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- findings -->
+<div class="tab-panel" id="panel-findings">
+  <div class="card">
+    <div class="card-head"><h2>Hallazgos</h2><span class="card-sub" id="findings-sub"></span></div>
+    <div id="findings"><div class="empty">Sin hallazgos todavia.</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Recomendaciones</h2></div>
+    <div id="recommendations"><div class="empty">Sin recomendaciones todavia.</div></div>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------------- attack -->
+<div class="tab-panel" id="panel-attack">
+  <div class="card">
+    <div class="card-head"><h2>Mapeo MITRE ATT&amp;CK</h2><span class="card-sub">tecnicas sustentadas en evidencia</span></div>
+    <div class="table-wrap">
+      <table id="attack-table">
+        <thead><tr><th>Tecnica</th><th>Nombre</th><th>Tactica</th><th>Evidencia</th><th>Confianza</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ----------------------------------------------------------------- siem -->
+<div class="tab-panel" id="panel-siem">
+  <div class="card">
+    <div class="card-head"><h2>Revision de las reglas de deteccion</h2>
+      <span class="card-sub">el SIEM tambien es un objeto de analisis</span></div>
+    <div class="table-wrap">
+      <table id="siem-table">
+        <thead><tr><th>Alerta</th><th>Problema</th><th>Severidad</th><th>Tecnica sugerida</th><th>Evidencia</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ----------------------------------------------------------------- iocs -->
+<div class="tab-panel" id="panel-iocs">
+  <div class="card">
+    <div class="card-head"><h2>Indicadores de compromiso</h2></div>
+    <div class="table-wrap">
+      <table id="iocs-table">
+        <thead><tr><th>Tipo</th><th>Valor</th><th>Contexto</th><th>Primera vez</th><th>Confianza</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ----------------------------------------------------------------- gaps -->
+<div class="tab-panel" id="panel-gaps">
+  <div class="grid grid-2">
+    <div class="card">
+      <div class="card-head"><h2>Huecos de telemetria</h2></div>
+      <div id="gaps"><div class="empty">Sin huecos documentados.</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Calidad de los datos</h2></div>
+      <div id="quality"><div class="empty">Sin incidencias de calidad.</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Resumen del analisis</h2></div>
+    <div id="summary-text" class="md-report"><div class="empty">Sin resumen.</div></div>
+  </div>
+</div>
+
+<!-- ----------------------------------------------------------------- chat -->
+<div class="tab-panel" id="panel-chat">
+  <div class="card">
+    <div class="card-head">
+      <h2>Consultas sobre este analisis</h2>
+      <span class="card-sub">el agente conserva el contexto del workspace</span>
+    </div>
+    <div class="chat" id="chat"></div>
+    <div class="chat-input">
+      <select class="chat-model" id="chat-model"></select>
+      <textarea id="chat-text" placeholder="Ej.: ¿que evidencia sostiene que la exfiltracion fue deliberada y no un backup?"></textarea>
+      <button class="btn btn-primary" id="chat-send">Enviar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.LOGSCOPE = {
+    analysisId: "{{ meta.id }}",
+    defaultModel: "{{ default_model }}",
+    provider: "{{ provider }}"
+  };
+</script>
+<script src="/static/js/analysis.js"></script>
+{% endblock %}

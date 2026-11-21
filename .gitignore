@@ -1,0 +1,41 @@
+# ---- entorno virtual ----
+.venv/
+venv/
+env/
+
+# ---- secretos (NUNCA versionar) ----
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ---- datos de analisis (privados) ----
+workspaces/*
+!workspaces/.gitkeep
+!workspaces/README.md
+
+# ---- artefactos generados ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+*.log
+logs/
+
+# ---- runtime opencode ----
+.opencode/state/
+.opencode/cache/
+opencode.db
+opencode.db-*
+
+# ---- SO / editores ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

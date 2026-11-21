@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}LogScope - Analisis{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block content %}
+<div class="spread">
+  <div>
+    <h1>Analisis de logs</h1>
+    <p class="muted small mt-0">Sube los logs, deja que opencode reconstruya el incidente y exporta el informe.</p>
+  </div>
+  <div class="row row-tight">
+    <a href="/settings" class="btn btn-ghost btn-sm">Ajustes de modelo</a>
+  </div>
+</div>
+
+<div class="grid grid-2 mt-2">
+  <div class="card">
+    <div class="card-head">
+      <h2>Subir logs</h2>
+      <span class="card-sub">CSV, JSON, LOG, TXT o ZIP</span>
+    </div>
+
+    <div class="dropzone" id="dropzone">
+      <div class="dz-icon">⬆</div>
+      <h3>Arrastra aqui tus ficheros</h3>
+      <p>o haz clic para seleccionarlos</p>
+      <input type="file" id="file-input" multiple hidden
+             accept=".csv,.json,.log,.txt,.zip">
+    </div>
+    <div class="file-list" id="file-list"></div>
+
+    <div class="mt-2">
+      <label class="field" for="analysis-name">Nombre del analisis</label>
+      <input type="text" id="analysis-name" placeholder="Ej. Evaluacion EVA_02 - exfiltracion">
+    </div>
+
+    <div class="grid grid-2 mt-2">
+      <div>
+        <label class="field" for="model-select">Modelo para el analisis</label>
+        <select id="model-select"><option>cargando catalogo...</option></select>
+      </div>
+      <div>
+        <label class="field" for="preset-select">Preset</label>
+        <select id="preset-select"></select>
+      </div>
+    </div>
+    <div class="mt-1 small faint" id="model-hint">
+      Solo se listan modelos de <b>{{ provider }}</b> con soporte de herramientas (tool calling).
+    </div>
+
+    <div class="row mt-2">
+      <button class="btn btn-primary" id="upload-btn" disabled>Analizar logs</button>
+      <button class="btn" id="upload-only-btn" disabled>Solo indexar</button>
+      <span id="upload-status" class="small muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Analisis previos</h2>
+      <span class="card-sub">{{ analyses|length }} en total</span>
+    </div>
+    <div id="analyses-list">
+      {% for item in analyses %}
+      <a class="analysis-card" href="/analysis/{{ item.id }}">
+        <div>
+          <div style="font-weight:600">{{ item.name }}</div>
+          <div class="meta">
+            <span>{{ item.events }} eventos</span>
+            <span>{{ item.files }} ficheros</span>
+            <span>{{ item.created_at[:16].replace('T', ' ') }}</span>
+            {% if item.model %}<span class="mono">{{ item.model }}</span>{% endif %}
+          </div>
+        </div>
+        <span class="badge {{ item.severity }}">{{ item.status }}</span>
+      </a>
+      {% else %}
+      <div class="empty">
+        Todavia no hay analisis.<br>Sube un conjunto de logs para empezar.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h2>Como funciona</h2>
+  </div>
+  <div class="grid grid-4">
+    <div class="stat">
+      <div class="stat-label">1 - Indexar</div>
+      <div class="stat-value" style="font-size:.9rem">Normalizar</div>
+      <div class="stat-note">Detecta el tipo de cada log por su cabecera y unifica todos los eventos en un esquema comun, ordenados en el tiempo.</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">2 - Medir</div>
+      <div class="stat-value" style="font-size:.9rem">Metricas</div>
+      <div class="stat-note">Calcula de forma determinista MTTD, permanencia, baseline de volumen y auditoria de las correlaciones del SIEM.</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">3 - Analizar</div>
+      <div class="stat-value" style="font-size:.9rem">opencode</div>
+      <div class="stat-note">Un agente especializado reconstruye la cadena de ataque, mapea ATT&CK y revisa las reglas de deteccion.</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">4 - Entregar</div>
+      <div class="stat-value" style="font-size:.9rem">Informe</div>
+      <div class="stat-note">Hallazgos priorizados, IOCs, huecos de telemetria y recomendaciones, exportables a Markdown, PDF y CSV.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

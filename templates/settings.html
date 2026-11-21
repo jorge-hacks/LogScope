@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}LogScope - Ajustes{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block content %}
+<h1>Ajustes de modelo</h1>
+<p class="muted small">
+  El catalogo se lee del propio servidor de opencode, asi que se actualiza solo
+  cuando el proveedor rota sus modelos. Los <b>presets</b> son alias estables:
+  si un modelo desaparece, reasignas el alias y el resto no cambia.
+</p>
+
+<div class="grid grid-2 mt-2">
+  <div class="card">
+    <div class="card-head">
+      <h2>Presets</h2>
+      <span class="card-sub">alias -&gt; modelo concreto</span>
+    </div>
+    <div id="presets-list"></div>
+    <button class="btn btn-sm mt-2" id="preset-add">Anadir preset</button>
+    <div class="row mt-2">
+      <button class="btn btn-primary" id="preset-save">Guardar presets</button>
+      <span id="preset-status" class="small muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Configuracion efectiva</h2>
+    </div>
+    <dl class="kv">
+      <dt>Proveedor</dt><dd class="mono">{{ provider }}</dd>
+      <dt>Modelo por defecto</dt><dd class="mono">{{ default_model }}</dd>
+      <dt>Cadena de fallback</dt><dd class="mono">{{ fallback_models|join(', ') }}</dd>
+      <dt>Fichero .env</dt><dd>{{ 'presente' if env_file_exists else 'no encontrado (se usan los valores por defecto)' }}</dd>
+    </dl>
+    <div class="notice mt-2">
+      Para cambiar el proveedor, el modelo por defecto o la cadena de fallback edita el
+      <code>.env</code> del proyecto y reinicia la aplicacion. <code>.env</code> esta en
+      <code>.gitignore</code> y nunca se sube al repositorio.
+    </div>
+    <div class="card-head mt-2"><h2>Estado del catalogo</h2></div>
+    <div id="catalog-meta" class="small muted">cargando...</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.LOGSCOPE = { provider: "{{ provider }}" };
+</script>
+<script src="/static/js/settings.js"></script>
+{% endblock %}
