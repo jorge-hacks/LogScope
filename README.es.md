@@ -178,19 +178,20 @@ Cada hallazgo del informe lleva los IDs de evento que lo respaldan. Si la
 evidencia no cierra, el agente documenta un **hueco de telemetría** en lugar de
 inventarse una historia.
 
-### 📐 Verificado sobre un caso real de evaluación
+### 📐 Qué produce el dataset de demostración
 
-Probado contra un incidente multietapa de 333 eventos (auth → firewall →
+Ejecutado sobre el dataset sintético incluido (304 eventos, auth → firewall →
 netflow → EDR → SIEM):
 
 | Hallazgo | Detectado por LogScope |
 |---|---|
+| 🔴 Lectura de tabla sensible seguida de 25,8 MB de egreso permitido | `SYS-00013`, `FW-00089/90`, `NF-00117/18` |
 | 🔴 Web shell detectada con `NOT_REMOVED`, todavía `ACTIVE` tres días después | `AV-00003` → `AV-00005` |
-| 🔴 25,8 MB exfiltrados (79× el baseline de volumen) | `FW-00095/96`, `NF-00125/26` |
-| 🟠 La contención ocurrió **después** de que los datos ya se hubieran ido (permanencia 6 d 8 h) | `SIEM-0012`, `SYS-00020` |
-| 🟠 8 alertas del SIEM con placeholders `AUTH-000?` sin resolver | `siem_alerts.csv` |
-| 🟠 `T1110.003 Password Spraying` aplicado a **una** cuenta → correctamente `T1110.001` | `AUTH-00033…40` |
-| 🟡 22 flujos imposibles (origen = destino) y 3 IP internas sin activo asociado | `integrity.json` |
+| 🟠 Acceso VPN con cuenta válida tras fuerza bruta sobre **una sola** cuenta | `AUTH-00037…44`, `SIEM-0001/0002` |
+| 🟠 La contención ocurrió **después** de que los datos ya se hubieran ido | `SIEM-0012` |
+| 🟠 8 alertas del SIEM con placeholders `AUTH-000?` sin resolver y 4 que citan eventos benignos | `siem_alerts.csv` |
+| 🟠 `T1110.003 Password Spraying` aplicado a **una** cuenta → correctamente `T1110.001` | `SIEM-0001` |
+| 🟡 IP internas sin activo asociado y un salto entre segmentos sin evidencia | `integrity.json` |
 
 ---
 
@@ -382,18 +383,28 @@ usa la superficie v1 verificada contra el binario local:
 
 ---
 
-## 🎓 Caso de estudio: Jaguar King's Star
+---
 
-LogScope se construyó para una evaluación de seguridad donde el resultado
-tenía que ser **defendible ante un auditor**. El caso (un incidente
-multietapa de 333 eventos en una plataforma de comercio electrónico) está
-documentado de extremo a extremo, incluida la **ejecución de Snort 3.12.2**
-sobre una captura reconstruida a partir de los registros CSV, que corrobora al
-segundo las detecciones del firewall.
+## 🎲 Probar con el dataset de demostración
 
-👉 [Material completo de la evaluación](https://github.com/jorge-hacks/evau2-logscope)
-(informe, reglas del IDS, evidencia y scripts de reproducción)
+El repositorio incluye un **dataset sintético** que reproduce la estructura de
+una investigación real: 304 eventos de seis fuentes, con una intrusión
+multietapa (acceso a credenciales, ejecución, persistencia, movimiento lateral,
+recolección y exfiltración) sobre un fondo de tráfico normal. Todos los
+hostnames, usuarios y direcciones son inventados; las externas pertenecen a los
+rangos de documentación de la RFC 5737.
 
+```bash
+python scripts/demo_dataset.py --output /tmp/demo_logs
+```
+
+Después, sube los seis CSV generados desde el dashboard, o usa el helper:
+
+```bash
+.venv/bin/python scripts/seed_demo.py /tmp/demo_logs "Demo - intrusion multi-etapa"
+```
+
+Las capturas de este README se produjeron exactamente con este dataset.
 
 ---
 

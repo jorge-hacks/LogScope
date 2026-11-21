@@ -176,19 +176,20 @@ Every finding in the report carries the event IDs that back it. If the
 evidence does not close, the agent documents a **telemetry gap** instead of
 inventing a story.
 
-### 📐 Verified on a real evaluation case
+### 📐 What the demo dataset produces
 
-Tested against a 333-event multi-stage incident (auth → firewall → netflow →
-EDR → SIEM):
+Run against the bundled synthetic dataset (304 events, auth → firewall →
+netflow → EDR → SIEM):
 
 | Finding | Detected by LogScope |
 |---|---|
+| 🔴 Sensitive table read followed by 25.8 MB of permitted egress | `SYS-00013`, `FW-00089/90`, `NF-00117/18` |
 | 🔴 Web shell detected with `NOT_REMOVED`, still `ACTIVE` three days later | `AV-00003` → `AV-00005` |
-| 🔴 25.8 MB exfiltrated (79× the volume baseline) | `FW-00095/96`, `NF-00125/26` |
-| 🟠 Containment happened **after** the data was already gone (dwell 6d 8h) | `SIEM-0012`, `SYS-00020` |
-| 🟠 8 SIEM alerts with unresolvable `AUTH-000?` placeholders | `siem_alerts.csv` |
-| 🟠 `T1110.003 Password Spraying` applied to **one** account → correctly `T1110.001` | `AUTH-00033…40` |
-| 🟡 22 impossible flows (src == dst) and 3 internal IPs with no asset owner | `integrity.json` |
+| 🟠 Valid-account VPN access preceded by brute force on a **single** account | `AUTH-00037…44`, `SIEM-0001/0002` |
+| 🟠 Containment happened **after** the data was already gone | `SIEM-0012` |
+| 🟠 8 SIEM alerts with unresolvable `AUTH-000?` placeholders, 4 citing benign events | `siem_alerts.csv` |
+| 🟠 `T1110.003 Password Spraying` applied to **one** account → correctly `T1110.001` | `SIEM-0001` |
+| 🟡 Internal IPs with no asset owner and a missing pivot between segments | `integrity.json` |
 
 ---
 
@@ -375,18 +376,29 @@ v1 surface verified against the local binary:
 
 ---
 
-## 🎓 Caso de estudio: Jaguar King's Star
+---
 
-LogScope se construyó para una evaluación de seguridad donde el resultado
-tenía que ser **defendible ante un auditor**. El caso (un incidente
-multietapa de 333 eventos en una plataforma de comercio electrónico) está
-documentado de extremo a extremo, incluida la **ejecución de Snort 3.12.2**
-sobre una captura reconstruida a partir de los registros CSV, que corrobora al
-segundo las detecciones del firewall.
+## 🎲 Try it with the demo dataset
 
-👉 [Material completo de la evaluación](https://github.com/jorge-hacks/evau2-logscope)
-(informe, reglas del IDS, evidencia y scripts de reproducción)
+The repository ships a **synthetic dataset** that reproduces the structure of a
+real investigation — 304 events across six sources, with a multi-stage intrusion
+(credential access, execution, persistence, lateral movement, collection and
+exfiltration) over a background of normal traffic. Every hostname, user and
+address is invented; the external ones belong to the RFC 5737 documentation
+ranges.
 
+```bash
+python scripts/demo_dataset.py --output /tmp/demo_logs
+```
+
+Then upload the six generated CSV files from the dashboard, or use the seed
+helper:
+
+```bash
+.venv/bin/python scripts/seed_demo.py /tmp/demo_logs "Demo - intrusion multi-stage"
+```
+
+The screenshots in this README were produced with exactly this dataset.
 
 ---
 

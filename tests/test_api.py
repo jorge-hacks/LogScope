@@ -15,8 +15,8 @@ from fastapi.testclient import TestClient
 from server.main import app
 
 SAMPLE = """event_id,timestamp,username,source_ip,destination_host,event_type,result,details
-AUTH-1,2025-03-20T01:02:00-03:00,mfuentes,198.51.100.42,JKS-VPN01,vpn_login,FAILURE,mal
-AUTH-2,2025-03-20T09:00:00-03:00,jrojas,10.10.20.27,JKS-SRV-APP01,interactive_logon,SUCCESS,normal
+AUTH-1,2025-05-07T01:02:00-03:00,a.torres,198.51.100.10,VPN01,vpn_login,FAILURE,mal
+AUTH-2,2025-05-07T09:00:00-03:00,d.perez,10.60.20.27,SRV-APP01,interactive_logon,SUCCESS,normal
 """
 
 
@@ -119,7 +119,7 @@ def test_export_markdown_and_csv(client: TestClient, tmp_path: Path, monkeypatch
         "summary": "Resumen de prueba",
         "severity_overall": "HIGH",
         "attack_chain": [
-            {"phase": "Initial Access", "title": "Acceso", "ts": "2025-03-20T01:02:00-03:00", "evidence": ["AUTH-1"]}
+            {"phase": "Initial Access", "title": "Acceso", "ts": "2025-05-07T01:02:00-03:00", "evidence": ["AUTH-1"]}
         ],
         "findings": [
             {"id": "H-01", "title": "Hallazgo", "severity": "HIGH", "evidence": ["AUTH-1"]}

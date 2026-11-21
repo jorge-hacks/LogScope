@@ -7,34 +7,34 @@ from pathlib import Path
 from analysis import audit_integrity, compute_metrics
 
 RAW = """event_id,timestamp,username,source_ip,destination_host,event_type,result,details
-AUTH-1,2025-03-20T01:02:00-03:00,mfuentes,198.51.100.42,JKS-VPN01,vpn_login,FAILURE,mal
-AUTH-2,2025-03-20T01:04:00-03:00,mfuentes,198.51.100.42,JKS-VPN01,vpn_login,FAILURE,mal
-AUTH-3,2025-03-20T01:06:00-03:00,mfuentes,198.51.100.42,JKS-VPN01,vpn_login,FAILURE,mal
-AUTH-4,2025-03-20T01:21:00-03:00,mfuentes,198.51.100.42,JKS-VPN01,vpn_login,SUCCESS,ok
-AUTH-5,2025-03-20T09:00:00-03:00,jrojas,10.10.20.27,JKS-SRV-APP01,interactive_logon,SUCCESS,normal
+AUTH-1,2025-05-07T01:02:00-03:00,a.torres,198.51.100.10,VPN01,vpn_login,FAILURE,mal
+AUTH-2,2025-05-07T01:04:00-03:00,a.torres,198.51.100.10,VPN01,vpn_login,FAILURE,mal
+AUTH-3,2025-05-07T01:06:00-03:00,a.torres,198.51.100.10,VPN01,vpn_login,FAILURE,mal
+AUTH-4,2025-05-07T01:21:00-03:00,a.torres,198.51.100.10,VPN01,vpn_login,SUCCESS,ok
+AUTH-5,2025-05-07T09:00:00-03:00,d.perez,10.60.20.27,SRV-APP01,interactive_logon,SUCCESS,normal
 """
 
 SYSTEM = """event_id,timestamp,hostname,host_ip,log_source,event_type,severity,message,username
-SYS-1,2025-03-19T08:00:00-03:00,JKS-SRV-APP01,10.10.30.21,Linux-Audit,service_start,INFO,Servicio web iniciado,
-SYS-2,2025-03-26T09:15:00-03:00,JKS-SRV-APP01,10.10.30.21,Linux-Audit,service_stop,INFO,Parada de emergencia,
+SYS-1,2025-05-06T08:00:00-03:00,SRV-APP01,10.60.30.21,Linux-Audit,service_start,INFO,Servicio web iniciado,
+SYS-2,2025-05-12T09:15:00-03:00,SRV-APP01,10.60.30.21,Linux-Audit,service_stop,INFO,Parada de emergencia,
 """
 
 SIEM = """alert_id,timestamp,tactic,technique_id,technique_name,source_ip,destination_or_host,username,severity,related_event_ids,description
-SIEM-1,2025-03-20T01:18:00-03:00,Credential Access,T1110.003,Password Spraying,198.51.100.42,JKS-VPN01,mfuentes,HIGH,AUTH-000?,fallos
-SIEM-2,2025-03-24T02:14:00-03:00,Execution,T1505.003,Web Shell,10.10.30.21,JKS-SRV-APP01,svc_backup,CRITICAL,AV-000?;SYS-1,web shell
+SIEM-1,2025-05-07T01:18:00-03:00,Credential Access,T1110.003,Password Spraying,198.51.100.10,VPN01,a.torres,HIGH,AUTH-000?,fallos
+SIEM-2,2025-05-11T02:14:00-03:00,Execution,T1505.003,Web Shell,10.60.30.21,SRV-APP01,svc_report,CRITICAL,AV-000?;SYS-1,web shell
 """
 
 NETFLOW = """flow_id,start_time,src_ip,dst_ip,src_port,dst_port,protocol,packets,bytes,direction,application
-NF-1,2025-03-20T10:00:00-03:00,10.10.20.14,10.10.30.21,50000,443,TCP,100,1000,EAST_WEST,business-traffic
-NF-2,2025-03-22T03:42:00-03:00,10.10.30.31,203.0.113.201,55110,443,TCP,8244,7420000,OUTBOUND,unknown-encrypted
-NF-3,2025-03-20T10:00:00-03:00,10.10.30.21,10.10.30.21,50001,445,TCP,50,900,EAST_WEST,business-traffic
-NF-4,2025-03-20T11:00:00-03:00,10.10.20.14,10.10.30.21,50002,443,TCP,100,1100,EAST_WEST,business-traffic
-NF-5,2025-03-20T12:00:00-03:00,10.10.20.27,10.10.30.21,50003,443,TCP,100,1200,EAST_WEST,business-traffic
-NF-6,2025-03-20T13:00:00-03:00,10.10.20.14,10.10.40.15,50004,443,TCP,100,1300,EAST_WEST,business-traffic
-NF-7,2025-03-20T14:00:00-03:00,10.10.20.27,10.10.30.21,50005,443,TCP,100,1400,EAST_WEST,business-traffic
-NF-8,2025-03-20T15:00:00-03:00,10.10.20.14,10.10.30.21,50006,443,TCP,100,1500,EAST_WEST,business-traffic
-NF-9,2025-03-20T16:00:00-03:00,10.10.20.27,10.10.30.21,50007,443,TCP,100,1600,EAST_WEST,business-traffic
-NF-10,2025-03-20T17:00:00-03:00,10.10.20.14,10.10.40.15,50008,443,TCP,100,1700,EAST_WEST,business-traffic
+NF-1,2025-05-07T10:00:00-03:00,10.60.20.14,10.60.30.21,50000,443,TCP,100,1000,EAST_WEST,business-traffic
+NF-2,2025-05-09T03:42:00-03:00,10.60.30.31,203.0.113.10,55110,443,TCP,8244,7420000,OUTBOUND,unknown-encrypted
+NF-3,2025-05-07T10:00:00-03:00,10.60.30.21,10.60.30.21,50001,445,TCP,50,900,EAST_WEST,business-traffic
+NF-4,2025-05-07T11:00:00-03:00,10.60.20.14,10.60.30.21,50002,443,TCP,100,1100,EAST_WEST,business-traffic
+NF-5,2025-05-07T12:00:00-03:00,10.60.20.27,10.60.30.21,50003,443,TCP,100,1200,EAST_WEST,business-traffic
+NF-6,2025-05-07T13:00:00-03:00,10.60.20.14,10.60.40.15,50004,443,TCP,100,1300,EAST_WEST,business-traffic
+NF-7,2025-05-07T14:00:00-03:00,10.60.20.27,10.60.30.21,50005,443,TCP,100,1400,EAST_WEST,business-traffic
+NF-8,2025-05-07T15:00:00-03:00,10.60.20.14,10.60.30.21,50006,443,TCP,100,1500,EAST_WEST,business-traffic
+NF-9,2025-05-07T16:00:00-03:00,10.60.20.27,10.60.30.21,50007,443,TCP,100,1600,EAST_WEST,business-traffic
+NF-10,2025-05-07T17:00:00-03:00,10.60.20.14,10.60.40.15,50008,443,TCP,100,1700,EAST_WEST,business-traffic
 """
 
 
@@ -78,7 +78,7 @@ def test_metrics_detect_auth_burst_signal(tmp_path: Path):
     metrics = compute_metrics(events)
     bursts = [s for s in metrics["signals"] if s["kind"] == "auth_failure_burst"]
     assert bursts
-    assert bursts[0]["actor"] == "mfuentes"
+    assert bursts[0]["actor"] == "a.torres"
 
 
 def test_metrics_compute_dwell_time(tmp_path: Path):
@@ -123,4 +123,4 @@ def test_integrity_detects_self_flows(tmp_path: Path):
     events = build_events(tmp_path)
     integrity = audit_integrity(events)
     assert len(integrity["self_flows"]) == 1
-    assert integrity["self_flows"][0]["ip"] == "10.10.30.21"
+    assert integrity["self_flows"][0]["ip"] == "10.60.30.21"

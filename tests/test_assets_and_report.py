@@ -59,7 +59,7 @@ def test_report_page_embeds_valid_json(client: TestClient, tmp_path: Path):
     sample = tmp_path / "auth.csv"
     sample.write_text(
         "event_id,timestamp,username,source_ip,destination_host,event_type,result\n"
-        "AUTH-1,2025-03-20T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
+        "AUTH-1,2025-05-07T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
         encoding="utf-8",
     )
     analysis_id = client.post(
@@ -99,7 +99,7 @@ def test_report_page_does_not_load_external_scripts(client: TestClient, tmp_path
     sample = tmp_path / "auth.csv"
     sample.write_text(
         "event_id,timestamp,username,source_ip,destination_host,event_type,result\n"
-        "AUTH-1,2025-03-20T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
+        "AUTH-1,2025-05-07T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
         encoding="utf-8",
     )
     analysis_id = client.post(
@@ -119,7 +119,7 @@ def test_report_renderer_escapes_untrusted_content(client: TestClient, tmp_path:
     sample = tmp_path / "auth.csv"
     sample.write_text(
         "event_id,timestamp,username,source_ip,destination_host,event_type,result\n"
-        "AUTH-1,2025-03-20T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
+        "AUTH-1,2025-05-07T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
         encoding="utf-8",
     )
     analysis_id = client.post(

@@ -11,16 +11,16 @@ from ingest import detect_profile, ingest_paths, parse_timestamp
 from ingest.profiles import normalize_severity
 
 SAMPLE_AUTH = """event_id,timestamp,username,source_ip,destination_host,event_type,result,details
-AUTH-1,2025-03-20T01:02:00-03:00,mfuentes,198.51.100.42,JKS-VPN01,vpn_login,FAILURE,Credenciales invalidas
-AUTH-2,2025-03-20T01:21:00-03:00,mfuentes,198.51.100.42,JKS-VPN01,vpn_login,SUCCESS,Acceso VPN
+AUTH-1,2025-05-07T01:02:00-03:00,a.torres,198.51.100.10,VPN01,vpn_login,FAILURE,Credenciales invalidas
+AUTH-2,2025-05-07T01:21:00-03:00,a.torres,198.51.100.10,VPN01,vpn_login,SUCCESS,Acceso VPN
 """
 
 SAMPLE_FIREWALL = """event_id,timestamp,src_ip,src_port,dst_ip,dst_port,protocol,action,rule_name,bytes_sent,bytes_received,application,username
-FW-1,2025-03-20T02:14:00-03:00,10.10.20.14,53122,198.51.100.42,443,TCP,ALLOW,USER_WEB_EGRESS,184200,1200,TLS,mfuentes
+FW-1,2025-05-07T02:14:00-03:00,10.60.20.14,53122,198.51.100.10,443,TCP,ALLOW,USER_WEB_EGRESS,184200,1200,TLS,a.torres
 """
 
 SAMPLE_GENERIC = """timestamp,event,user,source_ip,destination_ip,severity,message
-2025-03-21T02:00:00Z,login,jrojas,10.10.20.27,10.10.30.21,low,inicio de sesion
+2025-05-10T02:00:00Z,login,d.perez,10.60.20.27,10.60.30.21,low,inicio de sesion
 """
 
 
@@ -42,11 +42,11 @@ def test_detect_falls_back_to_generic():
 
 
 def test_parse_timestamp_with_and_without_offset():
-    _, epoch = parse_timestamp("2025-03-20T01:02:00-03:00")
+    _, epoch = parse_timestamp("2025-05-07T01:02:00-03:00")
     assert epoch > 0
-    text, epoch_naive = parse_timestamp("2025-03-20 01:02:00")
+    text, epoch_naive = parse_timestamp("2025-05-07 01:02:00")
     assert epoch_naive > 0
-    assert text == "2025-03-20 01:02:00"
+    assert text == "2025-05-07 01:02:00"
     assert parse_timestamp("no es una fecha")[1] == 0.0
 
 
@@ -112,8 +112,8 @@ def test_generic_profile_maps_columns(tmp_path: Path):
     result = ingest_paths([tmp_path / "g.csv"], tmp_path / "work")
     event = result.events[0]
     assert event["source_type"] == "generic"
-    assert event["actor"] == "jrojas"
-    assert event["src_ip"] == "10.10.20.27"
+    assert event["actor"] == "d.perez"
+    assert event["src_ip"] == "10.60.20.27"
     assert event["severity"] == "LOW"
 
 

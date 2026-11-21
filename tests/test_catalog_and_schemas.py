@@ -120,7 +120,7 @@ def test_report_schema_accepts_valid_document():
                 "evidence": ["AV-00005"],
             }
         ],
-        "iocs": [{"type": "ip", "value": "203.0.113.201"}],
+        "iocs": [{"type": "ip", "value": "203.0.113.10"}],
     }
     report = Report.model_validate(payload)
     assert report.severity_overall == "HIGH"
