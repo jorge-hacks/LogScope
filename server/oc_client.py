@@ -39,11 +39,11 @@ class ModelUnavailable(OpencodeError):
 
 
 class OpencodeClient:
-    def __init__(self, base_url: str, timeout: float = 30.0):
+    def __init__(self, base_url: str, timeout: float = 30.0, read_timeout: float = 600.0):
         self.base_url = base_url.rstrip("/")
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
-            timeout=httpx.Timeout(timeout, read=600.0, write=60.0, connect=10.0),
+            timeout=httpx.Timeout(timeout, read=read_timeout, write=60.0, connect=10.0),
         )
 
     async def aclose(self) -> None:

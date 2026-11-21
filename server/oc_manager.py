@@ -40,7 +40,7 @@ class OpencodeManager:
         )
 
     # -- ciclo de vida -------------------------------------------------------
-    async def start(self, timeout: float = 40.0) -> None:
+    async def start(self, timeout: float = 40.0, attempts: int = 3) -> None:
         async with self._lock:
             if self.process and self.process.poll() is None:
                 return
@@ -56,16 +56,41 @@ class OpencodeManager:
                 "--hostname",
                 "127.0.0.1",
             ]
-            log_handle = self.log_path.open("ab")
-            self.process = subprocess.Popen(  # noqa: S603
-                command,
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
-                cwd=str(settings.project_root),
-                env=env,
-                start_new_session=True,
-            )
-            await self._wait_healthy(timeout)
+            last_error: Exception | None = None
+            for attempt in range(1, attempts + 1):
+                log_handle = self.log_path.open("ab")
+                self.process = subprocess.Popen(  # noqa: S603
+                    command,
+                    stdout=log_handle,
+                    stderr=subprocess.STDOUT,
+                    cwd=str(settings.project_root),
+                    env=env,
+                    start_new_session=True,
+                )
+                try:
+                    await self._wait_healthy(timeout)
+                    return
+                except OpencodeError as exc:
+                    last_error = exc
+                    # El puerto puede seguir ocupado por una instancia anterior
+                    # que aun no ha soltado el socket: se espera y se reintenta.
+                    print(f"[logscope] opencode no arranco (intento {attempt}/{attempts}): {exc}")
+                    await self._stop_process()
+                    if attempt < attempts:
+                        await asyncio.sleep(1.5)
+
+            raise OpencodeError(f"opencode no arranco tras {attempts} intentos: {last_error}")
+
+    async def _stop_process(self) -> None:
+        process, self.process = self.process, None
+        if process and process.poll() is None:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(os.getpgid(process.pid), signal.SIGKILL)
 
     async def _wait_healthy(self, timeout: float) -> None:
         deadline = asyncio.get_running_loop().time() + timeout
@@ -77,7 +102,9 @@ class OpencodeManager:
                     f"Revisa {self.log_path}"
                 )
             try:
-                async with OpencodeClient(settings.opencode_base_url, timeout=5.0) as client:
+                async with OpencodeClient(
+                    settings.opencode_base_url, timeout=5.0, read_timeout=15.0
+                ) as client:
                     await client.health()
                 return
             except (OpencodeError, OSError) as exc:
@@ -86,7 +113,7 @@ class OpencodeManager:
         raise OpencodeError(f"opencode no arranco en {timeout:.0f}s: {last_error}")
 
     async def ensure_running(self) -> None:
-        async with OpencodeClient(settings.opencode_base_url, timeout=5.0) as client:
+        async with OpencodeClient(settings.opencode_base_url, timeout=5.0, read_timeout=15.0) as client:
             if await client.is_healthy():
                 return
         await self.start()

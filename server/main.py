@@ -487,24 +487,23 @@ async def _emit(state: RunState, kind: str, payload: dict[str, Any]) -> None:
 
 
 async def _consume_events(client: OpencodeClient, directory: str, state: RunState, session_id: str) -> None:
-    """Traduce el SSE de opencode a eventos de progreso para el navegador."""
+    """Traduce el SSE de opencode a eventos de progreso para el navegador.
+
+    Solo se reenvian las partes de texto de los mensajes del asistente: el
+    stream tambien incluye el prompt del usuario y los mensajes de otras
+    sesiones del mismo directorio.
+    """
+    assistant_messages: set[str] = set()
     try:
         async for event in client.stream_events(directory):
             etype = event.get("type", "")
             props = event.get("properties", {}) or {}
             if props.get("sessionID") and props["sessionID"] != session_id:
                 continue
-            if etype == "message.part.updated":
-                part = props.get("part", {}) or {}
-                if part.get("type") == "text" and part.get("text"):
-                    await _emit(state, "assistant", {"text": part["text"]})
-            elif etype == "message.part.delta":
-                delta = props.get("delta", {}) or {}
-                if delta.get("type") == "text" and delta.get("text"):
-                    await _emit(state, "delta", {"text": delta["text"]})
-            elif etype == "message.updated":
+            if etype == "message.updated":
                 info = props.get("info", {}) or {}
-                if info.get("role") == "assistant":
+                if info.get("role") == "assistant" and info.get("id"):
+                    assistant_messages.add(info["id"])
                     await _emit(
                         state,
                         "status",
@@ -513,6 +512,13 @@ async def _consume_events(client: OpencodeClient, directory: str, state: RunStat
                             f"tokens={info.get('tokens', {}).get('total', 0)}",
                         },
                     )
+            elif etype == "message.part.updated":
+                part = props.get("part", {}) or {}
+                if part.get("type") != "text" or not part.get("text"):
+                    continue
+                if part.get("messageID") and part["messageID"] not in assistant_messages:
+                    continue
+                await _emit(state, "assistant", {"text": part["text"], "part": part.get("id", "")})
             elif etype == "session.status":
                 await _emit(state, "status", {"text": f"estado: {props.get('status', '')}"})
     except asyncio.CancelledError:
@@ -725,26 +731,65 @@ async def api_chat(analysis_id: str, payload: dict[str, Any]) -> StreamingRespon
                     f"{root}/analysis/metrics.json. Responde en espanol, citando IDs de evento. "
                     f"Pregunta: {message}"
                 )
-                consumer: asyncio.Task | None = None
                 queue: asyncio.Queue = asyncio.Queue()
+                assistant_messages: set[str] = set()
+                parts: dict[str, str] = {}
 
                 async def pump() -> None:
                     async for event in client.stream_events(str(root)):
                         props = event.get("properties", {}) or {}
                         if props.get("sessionID") and props["sessionID"] != session_id:
                             continue
-                        if event.get("type") == "message.part.updated":
+                        etype = event.get("type", "")
+                        if etype == "message.updated":
+                            info = props.get("info", {}) or {}
+                            if info.get("role") == "assistant" and info.get("id"):
+                                assistant_messages.add(info["id"])
+                        elif etype == "message.part.updated":
                             part = props.get("part", {}) or {}
-                            if part.get("type") == "text" and part.get("text"):
-                                await queue.put({"kind": "assistant", "text": part["text"]})
+                            if part.get("type") != "text" or not part.get("text"):
+                                continue
+                            if part.get("messageID") and part["messageID"] not in assistant_messages:
+                                continue
+                            parts[part.get("id", str(len(parts)))] = part["text"]
+                            await queue.put({"kind": "assistant", "text": "\n\n".join(parts.values())})
 
-                consumer = asyncio.create_task(pump())
-                try:
+                pump_task = asyncio.create_task(pump())
+
+                async def run() -> None:
                     await client.send_message(session_id, context, model=requested, agent=settings.agent)
+
+                message_task = asyncio.create_task(run())
+                try:
+                    while True:
+                        getter = asyncio.create_task(queue.get())
+                        finished, _ = await asyncio.wait(
+                            {getter, message_task}, return_when=asyncio.FIRST_COMPLETED
+                        )
+                        if getter in finished:
+                            payload_event = getter.result()
+                            yield (
+                                f"event: {payload_event.get('kind', 'message')}\n"
+                                f"data: {json.dumps(payload_event, ensure_ascii=False)}\n\n"
+                            )
+                            continue
+                        getter.cancel()
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await getter
+                        # Vuelca lo que quedara en la cola antes de cerrar.
+                        while not queue.empty():
+                            payload_event = queue.get_nowait()
+                            yield (
+                                f"event: {payload_event.get('kind', 'message')}\n"
+                                f"data: {json.dumps(payload_event, ensure_ascii=False)}\n\n"
+                            )
+                        break
                 finally:
-                    consumer.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await consumer
+                    pump_task.cancel()
+                    message_task.cancel()
+                    for task in (pump_task, message_task):
+                        with contextlib.suppress(asyncio.CancelledError, Exception):
+                            await task
                 yield f"event: done\ndata: {json.dumps({'session_id': session_id})}\n\n"
         except (OpencodeError, ModelUnavailable) as exc:
             yield f"event: error\ndata: {json.dumps({'error': str(exc)})}\n\n"
