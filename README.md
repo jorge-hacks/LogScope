@@ -81,6 +81,34 @@ Todo se ajusta por variables de entorno (`.env`, que **nunca** se versiona).
 | `LOGSCOPE_WORKSPACES` | `workspaces` | Directorio de espacios de trabajo |
 | `LOGSCOPE_MAX_UPLOAD_MB` | `64` | Limite por fichero |
 
+## Ciclo de vida de un analisis
+
+```
+subir logs ──> indexar (determinista) ──> medir (determinista) ──> analizar (opencode) ──> informe
+              eventos, perfiles           MTTD, baseline,       hallazgos, ATT&CK,
+                                         integridad            revision SIEM, IOCs
+```
+
+Las dos primeras etapas son Python puro y dan resultado **inmediato**: por eso
+la pestana de eventos se llena en el momento (333 eventos en el caso EVA_02)
+mientras que las de hallazgos, ATT&CK, reglas SIEM e IOCs **dependen del
+agente de opencode** y aparecen cuando el informe se escribe y valida.
+
+Detalles que importan en uso real:
+
+- El informe se publica **en cuanto el agente escribe `report.json`** y este
+  valida contra el esquema, sin esperar a que termine el turno. Si el agente
+  lo reescribe con mejoras, se vuelve a publicar.
+- Un turno que se queda colgado (una llamada a herramienta que no se
+  resuelve) no bloquea el analisis para siempre: vence
+  `LOGSCOPE_ANALYSIS_TIMEOUT` (900 s por defecto) y el informe ya publicado
+  se conserva.
+- Si la aplicacion se reinicia con un analisis a medias, al arrancar
+  **reconcilia** los workspaces: los que tienen un informe valido pasan a
+  estado `done`.
+- La UI muestra un banner con el estado: sin informe / en curso / informe ya
+  disponible con el agente afinando / error.
+
 ## Seleccion de modelo
 
 opencode-go rota sus proveedores cada mes, asi que **nada esta codificado a
