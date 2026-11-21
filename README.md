@@ -1,240 +1,384 @@
-# LogScope
+<div align="center">
 
-**Analisis forense de logs de seguridad asistido por opencode.**
+<img src="docs/logo.svg" width="118" alt="LogScope logo">
 
-Sube tus logs (CSV de autenticacion, firewall, netflow, antivirus/EDR, SIEM o
-cualquier otro formato tabular), deja que el agente `log-analyst` de opencode
-reconstruya el incidente y exporta el informe en Markdown, PDF o CSV.
+# 🛡️ LogScope
 
-No es un clon de DefenSight-AI: aquel proyecto delega el analisis en una API
-de LLM con RAG vectorial (ChromaDB + sentence-transformers + torch, ~2.5 GB de
-dependencias). LogScope usa **opencode** como motor y sustituye el RAG por
-herramientas deterministas, que para logs con identificadores de evento son
-mas precisas que la similitud semantica.
+### **AI-powered security log analysis — powered exclusively by `opencode-go`**
+
+**Upload your firewall, authentication, netflow, EDR and SIEM logs → get a forensic incident report with evidence-backed findings, MITRE ATT&CK mapping, SIEM rule audit and IOCs.**
+
+[![Python](https://img.shields.io/badge/python-3.11%2B-2DD4BF?style=flat-square&logo=python&logoColor=black)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-7C9CFF?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![opencode](https://img.shields.io/badge/engine-opencode--go-2DD4BF?style=flat-square)](https://opencode.ai)
+[![models](https://img.shields.io/badge/models-33%20opencode--go-7C9CFF?style=flat-square)](https://opencode.ai)
+[![tests](https://img.shields.io/badge/tests-61%20passing-34D399?style=flat-square)](https://github.com/)
+[![license](https://img.shields.io/badge/license-MIT-FFD166?style=flat-square)](LICENSE)
+
+<p>
+  <a href="#-screenshots">📸 Screenshots</a> •
+  <a href="#-why-opencode-go">🤖 Why opencode-go</a> •
+  <a href="#-how-it-works">⚙️ How it works</a> •
+  <a href="#-quick-start">🚀 Quick start</a> •
+  <a href="#-model-selection">🎛️ Model selection</a> •
+  <a href="#-the-agent">🧠 The agent</a> •
+  <a href="#-api">🔌 API</a>
+</p>
+
+<p>
+  <b>English</b> ·
+  <a href="README.es.md">🇪🇸 Español</a>
+</p>
+
+</div>
 
 ---
 
-## Como funciona
+## ❓ The problem
 
-```
- 1. INGERIR          2. MEDIR               3. ANALIZAR              4. ENTREGAR
- ------------        --------------        ----------------------     ------------
- fingerprint     ->  metricas + audit  ->  agente log-analyst   ->  Markdown
- del CSV             deterministas        (opencode, streaming)      PDF
-                      en Python                                          CSV
-```
+Security teams drown in logs. The tools that help either **cost per token**
+(API-based copilots) or **guess with vectors** (RAG over log chunks). Both
+fail on the questions that matter in an audit:
 
-La division de trabajo es deliberada: **la aritmetica la hace Python y el
-juicio lo hace el modelo**. El agente no estima un MTTD ni resuelve una
-referencia SIEM "a ojo"; recibe `metrics.json` e `integrity.json` ya
-calculados, y su trabajo es reconstruir la cadena de ataque, mapear ATT&CK
-sustentado en evidencia, auditar las reglas de deteccion y priorizar
-hallazgos.
+> *Does the SIEM alert actually point to the event it claims?*
+> *Is this "password spraying" or just one account being guessed?*
+> *Was the threat actually remediated, or only detected?*
+
+LogScope takes a different route: **deterministic analysis in Python, judgement
+by an opencode agent.** Nothing is guessed, every claim cites real event IDs.
 
 ---
 
-## Requisitos
+## ✨ What it does
 
-| Componente | Version |
+| | |
 |---|---|
-| Python | 3.11+ |
-| [opencode](https://opencode.ai) | 1.19+ (CLI en el PATH o `LOGSCOPE_OPENCODE_BIN`) |
-| Proveedor de modelos | `opencode-go` (configurable) |
+| 🧩 **Detects log types automatically** | Fingerprints on the **header**, not the filename. 7 known profiles + a generic fallback for anything else. No configuration, no schema mapping. |
+| ⏱️ **Computes the hard numbers** | MTTD, dwell time, off-hours ratio, volume baseline and correlation integrity — all in Python, reproducible, verifiable. |
+| 🤖 **Reconstructs the attack** | An opencode agent rebuilds the kill chain phase by phase (Initial Access → Execution → Persistence → Priv Esc → Lateral Movement → Collection → Exfiltration → Containment). |
+| 🎯 **Audits the SIEM itself** | Flags placeholder references, citations pointing at benign events, non-existent IDs, wrong tactics and **mis-applied ATT&CK techniques**. |
+| 🧾 **Exports the evidence** | Markdown, PDF (8 pages, styled) and CSV for findings and events. |
+| 💬 **Answers follow-up questions** | Context-aware chat over the same workspace, with the model chosen per question. |
 
-LogScope **gestiona su propio servidor headless de opencode** (`opencode
-serve`), asi que no hay que arrancar nada a mano.
+---
 
-## Instalacion
+## 📸 Screenshots
+
+### 🏠 Upload & model selection
+
+<img src="docs/screenshots/01-inicio.png" alt="Upload screen" width="100%">
+
+### 🧩 Findings with evidence, ATT&CK and recommendations
+
+<img src="docs/screenshots/03-hallazgos.png" alt="Findings panel" width="100%">
+
+### 📊 Timeline, detection latency and dwell time
+
+<img src="docs/screenshots/02-cronologia.png" alt="Timeline panel" width="100%">
+
+### 🗂️ Filterable event table
+
+<img src="docs/screenshots/07-eventos.png" alt="Event table" width="100%">
+
+### 🔎 ATT&CK mapping and SIEM rule audit
+
+| ATT&CK mapping | SIEM rule review |
+|---|---|
+| <img src="docs/screenshots/04-attack.png" alt="MITRE ATT&CK mapping" width="100%"> | <img src="docs/screenshots/05-reglas-siem.png" alt="SIEM rule review" width="100%"> |
+
+### 📄 The generated report
+
+<img src="docs/screenshots/08-informe.png" alt="Report" width="100%">
+
+> Drop your own screenshots in `docs/screenshots/` and reference them with the same
+> naming scheme (`01-…`, `02-…`, …) — the layout above is the intended order.
+
+---
+
+## 🤖 Why opencode-go
+
+**LogScope is built to work with `opencode-go` and nothing else.** That is a
+deliberate decision, not a limitation.
+
+### ✅ Only `opencode-go` models are ever offered
+
+The catalogue is read **live** from the opencode server (`GET /provider`) and
+filtered to the configured provider. When `opencode-go` rotates its providers
+next month, the dropdown updates itself — **no code change, no redeploy**.
+
+```
+33 models · 4 free · 11 cheap · 12 mid · 6 premium
+```
+
+### ✅ Tool-calling is mandatory
+
+opencode does **not** validate that a model supports tool calls. A model
+without them would be accepted and then break the agent the moment it tried
+to read a log file. LogScope filters on `capabilities.toolcall == true`
+before showing anything.
+
+### ✅ Presets survive the rotation
+
+Users never bind to a model, they bind to an **alias**:
+
+| Preset | Model | Cost in/out | Purpose |
+|---|---|---|---|
+| `gratis` | `opencode-go/hy4-flash-free` | **0 / 0** | Iterating, CI, bulk triage |
+| `estandar` | `opencode-go/gpt-6-luna` | $0.1 / $0.5 | Default · 1.05M context |
+| `forense` | `opencode-go/kimi-k3.1-pro` | $2 / $10 | Deep attribution |
+
+If a model disappears, you re-point the alias in **Ajustes / Settings** — one
+click, nothing else changes.
+
+### ✅ Automatic fallback
+
+A model can be retired mid-month. If the request fails with opencode's
+`HTTP 500 UnknownError`, LogScope retries down the chain
+(`gpt-6-luna → deepseek-v4.1-flash → beam-free`) and **records in the report
+which model produced each section**.
+
+### ✅ Credentials stay with opencode
+
+LogScope never stores API keys. It drives the opencode CLI, which already
+holds your session:
 
 ```bash
-git clone <tu-repo> logscope && cd logscope
+opencode providers login      # if you ever need to re-authenticate
+```
 
+---
+
+## ⚙️ How it works
+
+```
+ ┌─────────────┐   ┌─────────────┐   ┌──────────────┐   ┌────────────┐
+ │  📥 INGEST  │   │  📏 MEASURE │   │  🤖 ANALYZE  │   │  📦 DELIVER │
+ ├─────────────┤   ├─────────────┤   ├──────────────┤   ├────────────┤
+ │ fingerprint │──▶│ MTTD        │──▶│ opencode-go  │──▶│ Markdown   │
+ │ by header   │   │ dwell time  │   │ log-analyst  │   │ PDF        │
+ │ 7 profiles  │   │ baseline    │   │ agent + skill│   │ CSV        │
+ │ + fallback  │   │ integrity   │   │ streamed SSE │   │            │
+ └─────────────┘   └─────────────┘   └──────────────┘   └────────────┘
+    ⚡ instant          ⚡ instant          ⏱️ 2–8 min         ⚡ instant
+```
+
+**The split is the whole point.** The model never does arithmetic and Python
+never does judgement:
+
+- **Python owns the numbers.** MTTD, dwell time, percentile baselines and
+  correlation integrity are computed deterministically. The model cannot
+  hallucinate an MTTD because it never computes one — it reads it.
+- **opencode owns the judgement.** Which phase a technique belongs to, whether
+  a control actually failed, how severe a finding is, what to recommend, and
+  above all **whether the evidence supports the claim**.
+
+Every finding in the report carries the event IDs that back it. If the
+evidence does not close, the agent documents a **telemetry gap** instead of
+inventing a story.
+
+### 📐 Verified on a real evaluation case
+
+Tested against a 333-event multi-stage incident (auth → firewall → netflow →
+EDR → SIEM):
+
+| Finding | Detected by LogScope |
+|---|---|
+| 🔴 Web shell detected with `NOT_REMOVED`, still `ACTIVE` three days later | `AV-00003` → `AV-00005` |
+| 🔴 25.8 MB exfiltrated (79× the volume baseline) | `FW-00095/96`, `NF-00125/26` |
+| 🟠 Containment happened **after** the data was already gone (dwell 6d 8h) | `SIEM-0012`, `SYS-00020` |
+| 🟠 8 SIEM alerts with unresolvable `AUTH-000?` placeholders | `siem_alerts.csv` |
+| 🟠 `T1110.003 Password Spraying` applied to **one** account → correctly `T1110.001` | `AUTH-00033…40` |
+| 🟡 22 impossible flows (src == dst) and 3 internal IPs with no asset owner | `integrity.json` |
+
+---
+
+## 🚀 Quick start
+
+**Requirements:** Python 3.11+ · [opencode](https://opencode.ai) 1.19+ with
+`opencode-go` connected.
+
+```bash
+git clone https://github.com/TU-USUARIO/logscope.git
+cd logscope
+
+# venv con uv (o con pip: python -m venv .venv && . .venv/bin/activate)
 uv venv .venv --python 3.13
 uv pip install --python .venv/bin/python -e ".[dev]"
 
-cp .env.example .env        # ajusta lo que necesites
-./scripts/run.sh            # http://127.0.0.1:8000
+cp .env.example .env
+./scripts/run.sh
 ```
 
-Con pip clasico:
+Open **http://127.0.0.1:8000** and drop your logs on it.
+
+LogScope **starts and supervises its own headless opencode server** — there is
+nothing else to launch.
+
+<details>
+<summary>🐍 Without uv</summary>
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev]"
 python -m uvicorn server.main:app --port 8000
 ```
+</details>
 
-## Configuracion
+---
 
-Todo se ajusta por variables de entorno (`.env`, que **nunca** se versiona).
+## ⚙️ Configuration
 
-| Variable | Por defecto | Descripcion |
+Everything is environment driven (`.env`, which is **never committed**).
+
+| Variable | Default | Description |
 |---|---|---|
-| `LOGSCOPE_HOST` / `LOGSCOPE_PORT` | `127.0.0.1` / `8000` | Direccion del dashboard |
-| `LOGSCOPE_OPENCODE_BIN` | `opencode` | Ruta al ejecutable de opencode |
-| `LOGSCOPE_OPENCODE_PORT` | `4099` | Puerto del servidor headless de opencode |
-| `LOGSCOPE_PROVIDER` | `opencode-go` | Unico proveedor admitido |
-| `LOGSCOPE_MODEL` | `opencode-go/gpt-6-luna` | Modelo por defecto del analisis |
-| `LOGSCOPE_SMALL_MODEL` | `opencode-go/hy4-flash-free` | Modelo auxiliar (titulos, compaction) |
-| `LOGSCOPE_AGENT` | `log-analyst` | Agente de opencode que ejecuta el analisis |
-| `LOGSCOPE_FALLBACK_MODELS` | `deepseek-v4.1-flash,beam-free` | Cadena de reserva |
-| `LOGSCOPE_WORKSPACES` | `workspaces` | Directorio de espacios de trabajo |
-| `LOGSCOPE_MAX_UPLOAD_MB` | `64` | Limite por fichero |
+| `LOGSCOPE_HOST` / `LOGSCOPE_PORT` | `127.0.0.1` / `8000` | Dashboard address |
+| `LOGSCOPE_OPENCODE_BIN` | `opencode` | Path to the opencode binary |
+| `LOGSCOPE_OPENCODE_PORT` | `4099` | Port for the managed headless server |
+| `LOGSCOPE_PROVIDER` | `opencode-go` | **The only provider allowed** |
+| `LOGSCOPE_MODEL` | `opencode-go/gpt-6-luna` | Default analysis model |
+| `LOGSCOPE_SMALL_MODEL` | `opencode-go/hy4-flash-free` | Auxiliary model (titles, compaction) |
+| `LOGSCOPE_AGENT` | `log-analyst` | opencode agent that runs the analysis |
+| `LOGSCOPE_FALLBACK_MODELS` | `deepseek-v4.1-flash,beam-free` | Retry chain |
+| `LOGSCOPE_ANALYSIS_TIMEOUT` | `900` | Seconds before a stuck turn is cut loose |
+| `LOGSCOPE_MAX_UPLOAD_MB` | `64` | Per-file upload limit |
 
-## Ciclo de vida de un analisis
+Precedence: **UI → environment → preset → default.**
 
-```
-subir logs ──> indexar (determinista) ──> medir (determinista) ──> analizar (opencode) ──> informe
-              eventos, perfiles           MTTD, baseline,       hallazgos, ATT&CK,
-                                         integridad            revision SIEM, IOCs
-```
+---
 
-Las dos primeras etapas son Python puro y dan resultado **inmediato**: por eso
-la pestana de eventos se llena en el momento (333 eventos en el caso EVA_02)
-mientras que las de hallazgos, ATT&CK, reglas SIEM e IOCs **dependen del
-agente de opencode** y aparecen cuando el informe se escribe y valida.
+## 🎛️ Model selection
 
-Detalles que importan en uso real:
+![Settings](docs/screenshots/09-ajustes.png)
 
-- El informe se publica **en cuanto el agente escribe `report.json`** y este
-  valida contra el esquema, sin esperar a que termine el turno. Si el agente
-  lo reescribe con mejoras, se vuelve a publicar.
-- Un turno que se queda colgado (una llamada a herramienta que no se
-  resuelve) no bloquea el analisis para siempre: vence
-  `LOGSCOPE_ANALYSIS_TIMEOUT` (900 s por defecto) y el informe ya publicado
-  se conserva.
-- Si la aplicacion se reinicia con un analisis a medias, al arrancar
-  **reconcilia** los workspaces: los que tienen un informe valido pasan a
-  estado `done`.
-- La UI muestra un banner con el estado: sin informe / en curso / informe ya
-  disponible con el agente afinando / error.
+- **Live dropdown** in the analysis screen and in the chat, grouped by cost tier
+  with the context window and $/Mtoken shown.
+- **Editable presets** — aliases that survive the monthly provider rotation.
+- **Per-message model in chat** — escalate a single hard question to a premium
+  model without re-running the whole analysis.
+- **Automatic fallback** with the reason recorded in the report.
 
-## Seleccion de modelo
+---
 
-opencode-go rota sus proveedores cada mes, asi que **nada esta codificado a
-mano**: el catalogo se lee del propio servidor (`GET /provider`) en cada
-peticion y se filtra al proveedor configurado, descartando los modelos sin
-soporte de *tool calling* (el servidor de opencode no lo valida y un modelo
-sin herramientas rompe al agente).
+## 🧠 The agent
 
-La UI ofrece tres mecanismos complementarios:
+Two files drive the analysis quality:
 
-1. **Dropdown dinamico** (analisis y chat), agrupado por tier de coste, con
-   coste y ventana de contexto visibles.
-2. **Presets**: alias estables (`gratis`, `estandar`, `forense`) que apuntan a
-   un modelo concreto. Si el modelo desaparece, reasignas el alias y no hay que
-   tocar nada mas. Editables en `/settings`.
-3. **Fallback automatico**: si el modelo principal devuelve error
-   (`HTTP 500 UnknownError`, tipico de un modelo retirado), se reintenta con el
-   siguiente de la cadena y **queda constancia en el informe**.
-
-Jerarquia de precedencia: `UI > variable de entorno > preset > default`.
-
-## El agente
-
-- `.opencode/agent/log-analyst.md`: agente con permisos acotados (lectura,
-  edicion dentro del workspace y bash; `webfetch`/`websearch` denegados para
-  que no divague) y una lista de verificacion antes de entregar.
-- `.opencode/skill/log-forensics/SKILL.md`: metodologia (baseline antes que
-  anomalia, cadena por fases, auditoria del propio SIEM, severidad, redaccion
-  de vacios de telemetria) y el esquema exacto del informe.
-
-La salida del agente (`report.json`) se valida con Pydantic. Si no valida, el
-backend reenvia el mensaje al agente con los errores de validacion para que
-lo corrija. El informe solo se publica cuando la estructura es correcta.
-
-## API
-
-| Metodo | Ruta | Descripcion |
-|---|---|---|
-| `GET` | `/api/health` | Estado de la app y del motor opencode |
-| `GET` | `/api/models` | Catalogo vivo de modelos + presets |
-| `POST` | `/api/presets` | Guarda los presets |
-| `POST` | `/api/upload` | Sube ficheros, normaliza y crea el analisis |
-| `GET` | `/api/analysis/{id}` | Metricas, integridad, informe y estado |
-| `GET` | `/api/analysis/{id}/events` | Eventos filtrados (fuente, severidad, texto, horario) |
-| `GET` | `/api/analysis/{id}/timeline` | Histogramas temporal y por hora |
-| `POST` | `/api/analysis/{id}/analyze` | Lanza el analisis |
-| `GET` | `/api/analysis/{id}/stream` | SSE con el progreso en vivo |
-| `POST` | `/api/analysis/{id}/chat` | Preguntas de seguimiento (SSE) |
-| `GET` | `/api/analysis/{id}/export/{md,pdf,findings.csv,events.csv}` | Exportaciones |
-
-Documentacion interactiva en `/docs` (OpenAPI automatico).
-
-## Estructura
-
-```
-server/      main.py (FastAPI), oc_client.py, oc_manager.py, schemas.py, config.py
-ingest/      detect.py (fingerprint), profiles.py (7 perfiles), normalize.py
-analysis/    metrics.py (MTTD, baseline, dwell), integrity.py (calidad y correlacion)
-models/      catalog.py (catalogo de modelos y presets)
-exporter/    Markdown, PDF (reportlab) y CSV
-.opencode/   agent/log-analyst.md y skill/log-forensics/SKILL.md
-templates/   base, index, analysis, settings, report
-static/      css/theme.css (tema oscuro propio) y js/
-scripts/     run.sh, restart.sh, seed_demo.py
-tests/       pytest
-```
-
-## Formatos de log reconocidos
-
-Se detectan por la **cabecera**, no por el nombre del fichero, asi que
-funciona con logs de cualquier proveedor:
-
-| Tipo | Columnas que lo identifican |
+| File | Role |
 |---|---|
-| Autenticacion | `event_id, timestamp, username, source_ip, event_type, result` |
+| `.opencode/agent/log-analyst.md` | The agent: scoped permissions (read, edit inside the workspace, bash; **`webfetch`/`websearch` denied** so it cannot wander), plus a pre-delivery checklist. |
+| `.opencode/skill/log-forensics/SKILL.md` | The methodology: baseline before anomaly, phase-by-phase reconstruction, SIEM self-audit, severity rubric, how to write down telemetry gaps, and the exact output schema. |
+
+The agent's `report.json` is **validated against a Pydantic schema**. If it
+does not validate, the backend re-prompts the agent with the validation errors
+so it can fix its own output. A report is only published when the structure
+is sound.
+
+---
+
+## 📂 Supported log formats
+
+Detection is based on the **header**, so it works with any vendor's export.
+
+| Type | Columns that identify it |
+|---|---|
+| Authentication | `event_id, timestamp, username, source_ip, event_type, result` |
 | Firewall | `event_id, timestamp, src_ip, dst_ip, dst_port, action, rule_name` |
 | Netflow | `flow_id, start_time, src_ip, dst_ip, dst_port, bytes, direction` |
 | Antivirus / EDR | `event_id, timestamp, threat_name, detection_status, action_taken` |
-| Alertas SIEM | `alert_id, timestamp, tactic, technique_id, severity` |
-| Sistema / Auditoria | `event_id, timestamp, hostname, log_source, event_type, message` |
-| Generico | cualquiera: infiere los campos por similitud de nombres |
+| SIEM alerts | `alert_id, timestamp, tactic, technique_id, severity` |
+| System / Audit | `event_id, timestamp, hostname, log_source, event_type, message` |
+| **Generic** | anything else — fields inferred by column-name similarity |
 
-## Metricas deterministas
+ZIP archives are expanded automatically.
 
-Las cifras que el informe cita salen de `analysis/metrics.json`, calculadas en
-Python sin intervencion del modelo:
+---
 
-| Metrica | Como se obtiene |
-|---|---|
-| MTTD | Para cada alerta SIEM, la senal tecnica mas reciente dentro de una ventana de 1 h; se reporta mediana, maximo y detalle por alerta |
-| Permanencia (dwell) | Primer indicio (`signals`) hasta el ultimo evento de contencion |
-| Baseline de volumen | Mediana y desviacion absoluta mediana (MAD). **El p95 no se usa como umbral**: un outlier infla el percentil y deja de detectarse. Umbral = `mediana + 8 x 1.4826 x MAD` |
-| Actividad nocturna | Ratio de eventos entre 00:00 y 06:59 por fuente |
-| Integridad | Referencias SIEM sin resolver, citas a eventos benignos, referencias inexistentes, incoherencias tactica/tecnica, flujos con origen = destino, activos sin inventario, detecciones sin atribucion |
+## 🔌 API
 
-## Desarrollo
+| Method | Route | Description |
+|---|---|---|
+| `GET` | `/api/health` | App and opencode engine status |
+| `GET` | `/api/models` | Live model catalogue + presets |
+| `POST` | `/api/presets` | Save presets |
+| `POST` | `/api/upload` | Upload, normalise and index |
+| `GET` | `/api/analysis/{id}` | Metrics, integrity, report, run state |
+| `GET` | `/api/analysis/{id}/events` | Filtered events (source, severity, text, hours) |
+| `GET` | `/api/analysis/{id}/timeline` | Time and hour histograms |
+| `POST` | `/api/analysis/{id}/analyze` | Launch the analysis |
+| `GET` | `/api/analysis/{id}/stream` | SSE with live progress |
+| `POST` | `/api/analysis/{id}/chat` | Follow-up questions (SSE) |
+| `GET` | `/api/analysis/{id}/export/{md,pdf,findings.csv,events.csv}` | Exports |
 
-```bash
-.venv/bin/pytest              # tests
-.venv/bin/ruff check .        # lint
-./scripts/restart.sh           # reinicio limpio (app + opencode)
+Interactive OpenAPI docs at **`/docs`**.
+
+---
+
+## 📁 Project structure
+
+```
+server/      main.py (FastAPI), oc_client.py, oc_manager.py, schemas.py, config.py
+ingest/      detect.py (fingerprint), profiles.py (7 profiles), normalize.py
+analysis/    metrics.py (MTTD, baseline, dwell), integrity.py (quality, correlation)
+models/      catalog.py (live catalogue, tiers, presets)
+exporter/    Markdown, PDF (reportlab) and CSV
+.opencode/   agent/log-analyst.md and skill/log-forensics/SKILL.md
+templates/   base, index, analysis, settings, report
+static/      css/theme.css (custom dark SOC theme) and js/
+scripts/     run.sh, restart.sh, screenshots.sh, seed_demo.py
+docs/        logo.svg and screenshots/ used by this README
+tests/       pytest
 ```
 
-Para cargar un conjunto de logs de ejemplo ya indexado (sin ejecutar el
-analisis):
+---
+
+## 🧪 Development
 
 ```bash
-.venv/bin/python scripts/seed_demo.py /ruta/a/logs "Nombre del caso"
+.venv/bin/pytest          # 61 tests
+.venv/bin/ruff check .    # lint
+./scripts/restart.sh      # clean restart (app + opencode)
+
+# preload an example case (indexes it, does not run the agent)
+.venv/bin/python scripts/seed_demo.py /path/to/logs "Case name"
 ```
 
-## Notas de implementacion
+CI runs on every push: lint + tests + an import/contract check.
 
-Detalles del contrato de opencode (1.x) que la aplicacion respeta:
+---
 
-- La API **v1** no lleva prefijo `/api`: `POST /session`, `POST
-  /session/{id}/message`, `GET /event`. La documentacion publicada en
-  opencode.ai/docs describe la v2, que no coincide.
-- `POST /session` toma `directory` en el **query string**, no en el cuerpo.
-- `GET /event` exige `?directory=<dir>` o no llegan los eventos de la sesion.
-- El modelo viaja **por mensaje**, asi que puede cambiarse entre mensajes del
-  chat sin relanzar el analisis.
-- Cualquier ruta desconocida devuelve `200` con el HTML de la web de
-  opencode: el cliente valida el `content-type`, no solo el codigo.
-- Un modelo inexistente produce `HTTP 500` con `{"name":"UnknownError"}`: es la
-  senal que dispara el fallback.
+## 🔐 Security notes
 
-## Licencia
+- **LogScope never stores API keys.** Authentication lives with opencode.
+- **Uploaded logs never leave the machine.** Everything runs locally.
+- **The report renders escaped.** Content coming from the logs is untrusted by
+  definition, so the UI escapes it — no raw HTML, no external CDN.
+- **Workspaces are git-ignored.** Customer data is never committed by accident.
+- The agent runs with `webfetch`/`websearch` **denied** and `external_directory`
+  restricted to the project.
 
-MIT. Ver [LICENSE](LICENSE).
+---
+
+## 📝 Implementation notes
+
+The opencode **1.x** API differs from the published v2 docs. LogScope uses the
+v1 surface verified against the local binary:
+
+- v1 routes have **no `/api` prefix**: `POST /session`, `POST /session/{id}/message`, `GET /event`
+- `POST /session` takes `directory` as a **query parameter**, not in the body
+- `GET /event` requires `?directory=<dir>` or no session events arrive
+- The model travels **per message**, so it can change mid-chat
+- Unknown routes return `200` with the opencode web UI HTML — the client
+  validates `content-type`, not just the status code
+- A non-existent model yields `HTTP 500 {"name":"UnknownError"}` — the trigger
+  for the fallback chain
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).
+
+<p align="center">
+  <sub>Built with 🛡️ for defenders. Powered by <a href="https://opencode.ai">opencode</a> and <code>opencode-go</code>.</sub>
+</p>

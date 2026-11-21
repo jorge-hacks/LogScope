@@ -436,15 +436,31 @@ async function sendChat() {
 }
 
 /* ------------------------------------------------------------------ wiring */
+function activateTab(name) {
+  const tab = document.querySelector(`#tabs .tab[data-tab="${name}"]`);
+  if (!tab) return;
+  document.querySelectorAll('#tabs .tab').forEach((t) => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+  tab.classList.add('active');
+  const panel = document.getElementById(`panel-${name}`);
+  if (panel) panel.classList.add('active');
+}
+
 function wire() {
   document.querySelectorAll('#tabs .tab').forEach((tab) => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('#tabs .tab').forEach((t) => t.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
-      tab.classList.add('active');
-      const panel = document.getElementById(`panel-${tab.dataset.tab}`);
-      if (panel) panel.classList.add('active');
+      activateTab(tab.dataset.tab);
+      // Enlace profundo: permite compartir una pestana concreta.
+      window.history.replaceState(null, '', `#${tab.dataset.tab}`);
     });
+  });
+
+  // Pestana inicial desde el hash de la URL.
+  const initial = (window.location.hash || '').replace('#', '');
+  if (initial) activateTab(initial);
+  window.addEventListener('hashchange', () => {
+    const name = (window.location.hash || '').replace('#', '');
+    if (name) activateTab(name);
   });
 
   document.getElementById('run-btn').addEventListener('click', runAnalysis);
