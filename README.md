@@ -375,6 +375,21 @@ v1 surface verified against the local binary:
 
 ---
 
+## 🎓 Caso de estudio: Jaguar King's Star
+
+LogScope se construyó para una evaluación de seguridad donde el resultado
+tenía que ser **defendible ante un auditor**. El caso (un incidente
+multietapa de 333 eventos en una plataforma de comercio electrónico) está
+documentado de extremo a extremo, incluida la **ejecución de Snort 3.12.2**
+sobre una captura reconstruida a partir de los registros CSV, que corrobora al
+segundo las detecciones del firewall.
+
+👉 [Material completo de la evaluación](https://github.com/TU-USUARIO/evau2-logscope)
+(informe, reglas del IDS, evidencia y scripts de reproducción)
+
+
+---
+
 ## 📄 License
 
 MIT — see [LICENSE](LICENSE).
