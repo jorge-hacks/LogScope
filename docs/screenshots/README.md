@@ -28,7 +28,7 @@ Imágenes que se referencian desde los README (inglés y español).
 
 3. Mantén los **mismos nombres**: los README los referencian por ruta.
 4. Si añades una captura nueva, añádela con el siguiente número y
-   referénciala en `README.md` y `README.es.md`.
+   referénciala en `README.md` y `README.en.md`.
 
 ## Recomendaciones
 

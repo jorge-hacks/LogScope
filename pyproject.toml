@@ -1,7 +1,7 @@
 [project]
 name = "logscope"
 version = "0.1.0"
-description = "Dashboard de analisis forense de logs de seguridad asistido por opencode-go"
+description = "Analisis forense de logs de seguridad asistido por opencode-go"
 readme = "README.md"
 requires-python = ">=3.11"
 keywords = [
