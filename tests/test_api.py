@@ -157,3 +157,56 @@ def test_presets_saved_and_reloaded(client: TestClient, tmp_path: Path, monkeypa
 
 def test_presets_reject_empty(client: TestClient):
     assert client.post("/api/presets", json={"presets": []}).status_code == 400
+
+
+def test_concordance_endpoint_rejects_unknown_format(client: TestClient, tmp_path: Path):
+    sample = tmp_path / "auth.csv"
+    sample.write_text(
+        "event_id,timestamp,username,source_ip,destination_host,event_type,result\n"
+        "AUTH-1,2025-05-07T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
+        encoding="utf-8",
+    )
+    analysis_id = client.post(
+        "/api/upload",
+        files={"files": ("auth.csv", sample.read_bytes(), "text/csv")},
+    ).json()["analysis_id"]
+
+    assert client.get(f"/api/analysis/{analysis_id}/concordance").json()["ok"] is False
+
+    response = client.post(
+        f"/api/analysis/{analysis_id}/concordance",
+        files={"file": ("basura.txt", b"no es un log de alertas\n", "text/plain")},
+    )
+    assert response.status_code == 400
+    assert "No se reconoce el formato" in response.json()["detail"]
+
+
+def test_concordance_endpoint_reconciles_snort_log(client: TestClient, tmp_path: Path):
+    sample = tmp_path / "auth.csv"
+    sample.write_text(
+        "event_id,timestamp,username,source_ip,destination_host,event_type,result\n"
+        "AUTH-1,2025-05-07T01:02:00-03:00,u,1.2.3.4,H,vpn_login,FAILURE\n",
+        encoding="utf-8",
+    )
+    analysis_id = client.post(
+        "/api/upload",
+        files={"files": ("auth.csv", sample.read_bytes(), "text/csv")},
+    ).json()["analysis_id"]
+
+    log = (
+        "05/07-01:02:00.000000 [**] [1:1000003:1] \"JKS-EXFILITRACION Transferencia\" [**] "
+        "[Priority: 0] {TCP} 1.2.3.4:5555 -> 9.9.9.9:443\n"
+    )
+    response = client.post(
+        f"/api/analysis/{analysis_id}/concordance",
+        files={"file": ("alert_fast.txt", log.encode(), "text/plain")},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["formato"] == "alert_log"
+    assert payload["resumen"]["combinaciones_ids"] == 1
+
+    # El resultado queda persistido y se puede recuperar.
+    guardado = client.get(f"/api/analysis/{analysis_id}/concordance").json()
+    assert guardado["ok"] is True

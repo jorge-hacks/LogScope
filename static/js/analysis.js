@@ -16,7 +16,9 @@ async function boot() {
   await loadData();
   await loadTimeline();
   await loadEvents(true);
+  await loadConcordance();
   wire();
+  wireConcordance();
 }
 
 /* -------------------------------------------------------------------- datos */
@@ -193,6 +195,117 @@ function renderState(data) {
     banner.innerHTML = `Informe generado${modelo}. Severidad global `
       + `<b>${LS.escape(meta.severity || 'INFO')}</b>.`;
   }
+}
+
+/* ------------------------------------------------------------ conciliacion */
+async function loadConcordance() {
+  try {
+    const data = await LS.api(`/api/analysis/${analysisId}/concordance`);
+    if (!data.ok) {
+      document.getElementById('concordance-empty').classList.remove('hide');
+      document.getElementById('concordance-result').classList.add('hide');
+      return;
+    }
+    renderConcordance(data);
+  } catch (err) {
+    /* sin conciliacion: se mantiene el estado vacio */
+  }
+}
+
+function renderConcordance(data) {
+  const resumen = data.resumen || {};
+  document.getElementById('concordance-empty').classList.add('hide');
+  document.getElementById('concordance-result').classList.remove('hide');
+  document.getElementById('c-concordance').textContent = resumen.concordantes || 0;
+
+  const porcentaje = Math.round((resumen.tasa_concordancia || 0) * 100);
+  const delta = resumen.delta_maximo;
+  const tarjetas = [
+    { k: 'Combinaciones del IDS', v: resumen.combinaciones_ids || 0, n: `${resumen.alertas_ids || 0} alertas en total` },
+    { k: 'Concordantes', v: `${resumen.concordantes || 0} (${porcentaje} %)`, n: `${resumen.firmas_concordantes || 0} de ${resumen.firmas_ids || 0} firmas` },
+    { k: 'Desfase máximo', v: delta === null || delta === undefined ? 'n/d' : `${delta} s`, n: `ventana de ${resumen.ventana_concordancia || 120} s` },
+    { k: 'Solo en el registro', v: (data.anomalias_solo_logscope || []).length, n: 'anomalías que el IDS no puede ver' },
+  ];
+  document.getElementById('conc-stats').innerHTML = tarjetas.map((t) => `
+    <div class="stat">
+      <div class="stat-label">${LS.escape(t.k)}</div>
+      <div class="stat-value">${LS.escape(String(t.v))}</div>
+      <div class="stat-note">${LS.escape(t.n)}</div>
+    </div>`).join('');
+
+  const cuerpo = document.querySelector('#conc-table tbody');
+  cuerpo.innerHTML = (data.por_firma || []).map((f) => `
+    <tr>
+      <td class="mono">${LS.escape(f.firma)}</td>
+      <td>${LS.escape(f.nombre || '')}</td>
+      <td class="small muted">${LS.escape(f.criterio || '')}</td>
+      <td class="mono">${f.combinaciones}</td>
+      <td class="mono">${f.concordantes}</td>
+      <td class="mono">${f.alertas}</td>
+      <td><span class="badge ${f.estado === 'coincide' ? 'ok' : 'pending'}">${LS.escape(f.estado)}</span></td>
+    </tr>`).join('');
+
+  const detalle = document.querySelector('#conc-detail tbody');
+  detalle.innerHTML = (data.detalle || []).map((d) => `
+    <tr>
+      <td class="mono">${LS.escape(d.firma)}</td>
+      <td class="mono">${LS.escape(d.origen)}</td>
+      <td class="mono">${LS.escape(d.destino)}</td>
+      <td class="mono small">${LS.escape(d.primera_deteccion_ids || '')}</td>
+      <td class="mono small">${LS.escape(d.evento_log || '-')}</td>
+      <td class="mono small">${LS.escape((d.instante_log || '').replace('T', ' '))}</td>
+      <td class="mono">${d.delta_segundos === null || d.delta_segundos === undefined ? '-' : d.delta_segundos + ' s'}</td>
+      <td class="small">${LS.escape(d.estado)}</td>
+    </tr>`).join('');
+  document.getElementById('conc-detail-sub').textContent =
+    `${data.fichero || 'log del IDS'} · formato ${data.formato || '-'}`;
+
+  const sinConcordar = (resumen.firmas_sin_concordancia || []);
+  document.getElementById('conc-caveat').innerHTML =
+    '<b>Alcance de la validación.</b> La concordancia entre ambos instrumentos ' +
+    'acredita la coherencia interna de dos metodologías de análisis sobre el mismo ' +
+    'material, no una confirmación independiente del hecho: el origen de los datos es común. ' +
+    'La validación tampoco es simétrica: el IDS coincide en todo lo que ocurre en la red, ' +
+    'pero no puede ver los hallazgos de registro —flujos imposibles, direcciones sin ' +
+    'activo asociado, correlaciones no resolubles del SIEM o saltos sin evidencia entre ' +
+    'hosts—, que son precisamente los que aporta el análisis del registro.' +
+    (sinConcordar.length ? ` Firmas del IDS sin concordancia: ${sinConcordar.join(', ')}.` : '');
+}
+
+function wireConcordance() {
+  const input = document.getElementById('ids-file');
+  const boton = document.getElementById('ids-upload');
+  const estado = document.getElementById('ids-status');
+
+  document.getElementById('ids-pick').addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    const archivo = input.files && input.files[0];
+    boton.disabled = !archivo;
+    document.getElementById('ids-file-name').textContent = archivo ? archivo.name : '';
+  });
+
+  boton.addEventListener('click', async () => {
+    const archivo = input.files && input.files[0];
+    if (!archivo) return;
+    const form = new FormData();
+    form.append('file', archivo, archivo.name);
+    boton.disabled = true;
+    estado.innerHTML = '<span class="spinner"></span> conciliando...';
+    try {
+      const data = await LS.api(`/api/analysis/${analysisId}/concordance`, {
+        method: 'POST',
+        body: form,
+      });
+      renderConcordance(data);
+      const r = data.resumen || {};
+      estado.innerHTML =
+        `<span style="color:var(--success)">${r.concordantes}/${r.combinaciones_ids} combinaciones concordantes ` +
+        `(${Math.round((r.tasa_concordancia || 0) * 100)} %)</span>`;
+    } catch (err) {
+      estado.innerHTML = `<span style="color:var(--critical)">${LS.escape(err.message)}</span>`;
+    }
+    boton.disabled = false;
+  });
 }
 
 /* ---------------------------------------------------------------- informe */

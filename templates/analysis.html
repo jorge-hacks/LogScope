@@ -55,6 +55,7 @@
   <button class="tab" data-tab="siem">Reglas SIEM <span class="count" id="c-siem">0</span></button>
   <button class="tab" data-tab="iocs">IOCs <span class="count" id="c-iocs">0</span></button>
   <button class="tab" data-tab="gaps">Telemetria</button>
+  <button class="tab" data-tab="concordance">Conciliación IDS <span class="count" id="c-concordance">0</span></button>
   <button class="tab" data-tab="chat">Chat</button>
 </div>
 
@@ -188,6 +189,70 @@
   <div class="card">
     <div class="card-head"><h2>Resumen del analisis</h2></div>
     <div id="summary-text" class="md-report"><div class="empty">Sin resumen.</div></div>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------------- concordancia -->
+<div class="tab-panel" id="panel-concordance">
+  <div class="card">
+    <div class="card-head">
+      <h2>Conciliación con un IDS externo</h2>
+      <span class="card-sub">Snort opera sobre el flujo de red; LogScope, sobre el registro</span>
+    </div>
+    <p class="small muted">
+      Sube el log de alertas del IDS (el resumen por combinaciones
+      <code>alertas_resumen.csv</code> o el log crudo <code>alert_fast.txt</code>) y la
+      herramienta cruzará cada detección con los eventos del registro, para responder tres
+      preguntas: si ambos instrumentos identifican los mismos comportamientos, con qué
+      desfase temporal, y qué detecta solo uno de los dos.
+    </p>
+    <div class="row mt-2">
+      <input type="file" id="ids-file" accept=".csv,.txt,.log" hidden>
+      <button class="btn" id="ids-pick">Seleccionar log del IDS</button>
+      <button class="btn btn-primary" id="ids-upload" disabled>Conciliar</button>
+      <span id="ids-status" class="small muted"></span>
+    </div>
+    <div id="ids-file-name" class="small faint mt-1"></div>
+  </div>
+
+  <div id="concordance-empty" class="card">
+    <div class="empty">
+      Todavia no se ha conciliado ningun IDS.<br>
+      El resultado mostrara el acuerdo entre detecciones, el desfase temporal y las
+      detecciones exclusivas de cada instrumento.
+    </div>
+  </div>
+
+  <div id="concordance-result" class="hide">
+    <div class="grid grid-4" id="conc-stats"></div>
+    <div class="card mt-2">
+      <div class="card-head"><h2>Concordancia por firma</h2></div>
+      <div class="table-wrap">
+        <table id="conc-table">
+          <thead><tr>
+            <th>Firma</th><th>Comportamiento</th><th>Criterio</th>
+            <th>Combinaciones</th><th>Concordantes</th><th>Alertas</th><th>Estado</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Detalle por combinación</h2>
+        <span class="card-sub" id="conc-detail-sub"></span>
+      </div>
+      <div class="table-wrap" style="max-height:520px;overflow-y:auto">
+        <table id="conc-detail">
+          <thead><tr>
+            <th>Firma</th><th>Origen</th><th>Destino</th><th>1a deteccion (IDS)</th>
+            <th>Evento (registro)</th><th>Instante (registro)</th><th>Δ</th><th>Estado</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="notice warn mt-2" id="conc-caveat"></div>
   </div>
 </div>
 

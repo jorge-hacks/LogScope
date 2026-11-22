@@ -408,6 +408,39 @@ Las capturas de este README se produjeron exactamente con este dataset.
 
 ---
 
+---
+
+## 🔬 Convalidación frente a un IDS externo
+
+El análisis no tiene por qué darse por bueno. LogScope puede **contrastarse con
+un sistema de detección de intrusiones independiente** para comprobar que ambos
+llegan a las mismas conclusiones.
+
+Sube el log de alertas del IDS —el resumen por combinaciones
+(`alertas_resumen.csv`) o el log crudo de Snort (`alert_fast.txt`)— y LogScope
+cruza cada detección con los eventos del registro. Responde a tres preguntas:
+
+| Pregunta | Métrica |
+|---|---|
+| ¿Coinciden? | Combinaciones y firmas concordantes, en porcentaje |
+| ¿Cuándo? | Desfase temporal entre la alerta del IDS y el evento del registro, combinación a combinación |
+| ¿Y en exclusiva? | Comportamientos que solo uno de los dos puede ver |
+
+La distinción es importante: un IDS opera sobre el **flujo de red** (firmas de
+paquete) y LogScope sobre el **registro de eventos** (métricas y correlación).
+No miden lo mismo, así que la comparación no es entre cifras coincidentes sino
+entre **hechos coincidentes**; y el resultado se enuncia con sus límites, porque
+una captura reconstruida a partir de los mismos registros comparte su origen y
+valida, por tanto, la coherencia de dos metodologías de análisis y no una
+confirmación independiente del incidente.
+
+Validado de extremo a extremo sobre un incidente multietapa de 333 eventos:
+**35 de 35 combinaciones concordantes, con un desfase temporal de cero segundos
+en todas ellas**, y las ocho firmas concordantes.
+
+
+---
+
 ## 📄 Licencia
 
 MIT — ver [LICENSE](LICENSE).

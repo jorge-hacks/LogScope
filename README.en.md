@@ -402,6 +402,38 @@ The screenshots in this README were produced with exactly this dataset.
 
 ---
 
+## 🔬 Cross-validation against an external IDS
+
+The analysis does not have to be taken on faith. LogScope can be **confronted
+with an independent intrusion detection system** to check that both reach the
+same conclusions.
+
+Upload the IDS alert log —either the per-combination summary
+(`alertas_resumen.csv`) or the raw Snort log (`alert_fast.txt`)— and LogScope
+crosses every detection against the events in the record. It answers three
+questions:
+
+| Question | Metric |
+|---|---|
+| Do they agree? | Concordant combinations and signatures, as a percentage |
+| When? | Time offset between the IDS alert and the log event, per combination |
+| And exclusively? | Behaviours only one of the two can see |
+
+The distinction matters: an IDS works on **network flow** (packet signatures)
+and LogScope on the **event record** (metrics and correlation). They are not
+measuring the same thing, so the comparison is not between matching numbers but
+between **matching facts** —and the result is stated with its limits, because
+a capture reconstructed from the same records shares its source and therefore
+validates the coherence of two analysis methodologies rather than confirming
+the incident independently.
+
+Validated end to end on a 333-event multi-stage incident: **35 of 35
+combinations concordant, with a time offset of zero seconds in all of them**,
+and all eight signatures concordant.
+
+
+---
+
 ## 📄 License
 
 MIT — see [LICENSE](LICENSE).

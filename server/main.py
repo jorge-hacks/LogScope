@@ -31,7 +31,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
-from analysis import audit_integrity, compute_metrics, hour_histogram, timeline_histogram
+from analysis import (
+    audit_integrity,
+    compute_metrics,
+    hour_histogram,
+    parse_ids,
+    reconcile,
+    timeline_histogram,
+    tz_from_offset,
+)
 from exporter import export_findings_csv, export_pdf, export_report_markdown
 from ingest import ingest_paths, write_events
 from models import build_catalog
@@ -1034,6 +1042,60 @@ async def api_chat(analysis_id: str, payload: dict[str, Any]) -> StreamingRespon
             yield f"event: error\ndata: {json.dumps({'error': str(exc)})}\n\n"
 
     return StreamingResponse(generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+# ---------------------------------------------------------------------------
+# API - conciliacion con un IDS externo
+# ---------------------------------------------------------------------------
+@app.get("/api/analysis/{analysis_id}/concordance")
+async def api_concordance(analysis_id: str) -> dict[str, Any]:
+    """Devuelve la conciliacion ya calculada, si existe."""
+    path = workspace_path(analysis_id) / "analysis" / "concordance.json"
+    if not path.exists():
+        return {"ok": False, "estado": "sin_conciliar", "mensaje": "Aun no se ha subido ningun log del IDS"}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@app.post("/api/analysis/{analysis_id}/concordance")
+async def api_concordance_upload(analysis_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    """Cruza un log de alertas de IDS con el analisis de este caso.
+
+    Acepta el resumen por combinaciones (sid,firma,origen,destino,...) o un
+    log crudo de alertas de Snort.
+    """
+    root = workspace_path(analysis_id)
+    if not root.exists():
+        raise HTTPException(status_code=404, detail="Analisis no encontrado")
+
+    from ingest import read_events
+
+    events = read_events(root / "normalized" / "events.jsonl")
+    metrics_path = root / "analysis" / "metrics.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.exists() else {}
+
+    tz = tz_from_offset(metrics.get("window", {}).get("utc_offset", ""))
+    contenido = (await file.read()).decode("utf-8", errors="replace")
+    if not contenido.strip():
+        raise HTTPException(status_code=400, detail="El fichero esta vacio")
+
+    try:
+        formato, combinaciones = parse_ids(contenido, tz)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not combinaciones:
+        raise HTTPException(status_code=400, detail="No se encontro ninguna alerta en el fichero")
+
+    resultado = reconcile(combinaciones, events, metrics)
+    resultado["ok"] = True
+    resultado["formato"] = formato
+    resultado["fichero"] = file.filename or ""
+    resultado["generado"] = _now()
+
+    destino = root / "analysis" / "concordance.json"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(json.dumps(resultado, indent=2, ensure_ascii=False), encoding="utf-8")
+    return resultado
 
 
 # ---------------------------------------------------------------------------
