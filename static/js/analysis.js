@@ -217,6 +217,7 @@ function renderConcordance(data) {
   document.getElementById('concordance-empty').classList.add('hide');
   document.getElementById('concordance-result').classList.remove('hide');
   document.getElementById('c-concordance').textContent = resumen.concordantes || 0;
+  if (typeof activarDescarga === 'function') activarDescarga();
 
   const porcentaje = Math.round((resumen.tasa_concordancia || 0) * 100);
   const delta = resumen.delta_maximo;
@@ -272,16 +273,51 @@ function renderConcordance(data) {
     (sinConcordar.length ? ` Firmas del IDS sin concordancia: ${sinConcordar.join(', ')}.` : '');
 }
 
+function activarDescarga() {
+  const botonCopiar = document.getElementById('ids-copy');
+  const botonMd = document.getElementById('ids-md');
+  if (!botonCopiar || !botonMd) return;
+  botonCopiar.disabled = false;
+  botonMd.hidden = false;
+  botonMd.href = `/api/analysis/${analysisId}/concordance.md`;
+  botonMd.download = `${analysisId}-conciliacion.md`;
+}
+
 function wireConcordance() {
   const input = document.getElementById('ids-file');
   const boton = document.getElementById('ids-upload');
   const estado = document.getElementById('ids-status');
+  const botonCopiar = document.getElementById('ids-copy');
+  const botonMd = document.getElementById('ids-md');
 
   document.getElementById('ids-pick').addEventListener('click', () => input.click());
   input.addEventListener('change', () => {
     const archivo = input.files && input.files[0];
     boton.disabled = !archivo;
     document.getElementById('ids-file-name').textContent = archivo ? archivo.name : '';
+  });
+
+  botonCopiar.addEventListener('click', async () => {
+    try {
+      const respuesta = await fetch(`/api/analysis/${analysisId}/concordance.md`);
+      const texto = await respuesta.text();
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(texto);
+        estado.innerHTML = '<span style="color:var(--success)">informe copiado al portapapeles</span>';
+      } else {
+        // Sin portapapeles seguro: se muestra el texto para copiar a mano.
+        const area = document.createElement('textarea');
+        area.value = texto;
+        area.style.cssText = 'width:100%;height:220px;margin-top:8px;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:var(--mono);font-size:12px';
+        area.id = 'ids-textarea';
+        document.getElementById('ids-file-name').after(area);
+        area.focus();
+        area.select();
+        estado.innerHTML = '<span style="color:var(--medium)">texto seleccionado: copiala con Ctrl+C</span>';
+      }
+    } catch (err) {
+      estado.innerHTML = `<span style="color:var(--critical)">${LS.escape(err.message)}</span>`;
+    }
   });
 
   boton.addEventListener('click', async () => {
@@ -301,6 +337,7 @@ function wireConcordance() {
       estado.innerHTML =
         `<span style="color:var(--success)">${r.concordantes}/${r.combinaciones_ids} combinaciones concordantes ` +
         `(${Math.round((r.tasa_concordancia || 0) * 100)} %)</span>`;
+      activarDescarga();
     } catch (err) {
       estado.innerHTML = `<span style="color:var(--critical)">${LS.escape(err.message)}</span>`;
     }

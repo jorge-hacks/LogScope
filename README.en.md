@@ -431,6 +431,9 @@ Validated end to end on a 333-event multi-stage incident: **35 of 35
 combinations concordant, with a time offset of zero seconds in all of them**,
 and all eight signatures concordant.
 
+The result can be exported as **Markdown**, ready to paste into a report or a
+ticket, from the button next to the upload field.
+
 
 ---
 

@@ -438,6 +438,9 @@ Validado de extremo a extremo sobre un incidente multietapa de 333 eventos:
 **35 de 35 combinaciones concordantes, con un desfase temporal de cero segundos
 en todas ellas**, y las ocho firmas concordantes.
 
+El resultado puede exportarse como **Markdown**, listo para pegar en un informe
+o en un ticket, con el botón que acompaña al campo de subida.
+
 
 ---
 

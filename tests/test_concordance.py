@@ -125,3 +125,23 @@ def test_tz_from_offset():
     assert tz_from_offset("-03:00").utcoffset(None) == timedelta(hours=-3)
     assert tz_from_offset("+02:00").utcoffset(None) == timedelta(hours=2)
     assert tz_from_offset("basura").utcoffset(None) == timedelta(0)
+
+
+def test_render_markdown_incluye_resumen_y_tabla_de_firmas():
+    from analysis.concordance import render_markdown
+
+    _, filas = parse_ids(RESUMEN_CSV, TZ)
+    resultado = reconcile(filas, _eventos(), _metrics())
+    resultado["fichero"] = "alertas_resumen.csv"
+    resultado["formato"] = "resumen_csv"
+
+    texto = render_markdown(resultado, nombre="Caso de prueba", generado="2025-03-22T15:00:00-03:00")
+
+    assert "# Conciliación entre Snort y LogScope" in texto
+    assert "**Caso:** Caso de prueba" in texto
+    assert "| Combinaciones detectadas por el IDS | 2 |" in texto
+    assert "JKS-EXFILITRACION" in texto
+    assert "FW-00095" in texto
+    assert "## Alcance de la validación" in texto
+    # Formato numerico espanol: punto de miles (17.027 alertas en el fixture).
+    assert "17.027" in texto

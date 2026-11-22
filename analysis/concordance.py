@@ -29,12 +29,12 @@ from typing import Any
 # Firma -> (nombre legible, criterio de deteccion)
 FIRMAS: dict[str, tuple[str, str]] = {
     "JKS-ESCANEO": ("Escaneo de puertos externo", "perimetro"),
-    "JKS-PERIMETRO": ("Conexion bloqueada en el perimetro", "perimetro"),
-    "JKS-EXFILITRACION": ("Transferencia saliente anomala sobre TLS", "volumen"),
+    "JKS-PERIMETRO": ("Conexión bloqueada en el perímetro", "perimetro"),
+    "JKS-EXFILITRACION": ("Transferencia saliente anómala sobre TLS", "volumen"),
     "JKS-C2": ("Canal de mando y control", "volumen"),
     "JKS-SSH-SALIDA": ("Intento de salida por SSH", "egress"),
-    "JKS-MOV-LATERAL": ("Conexion SMB entre servidores internos", "lateral"),
-    "JKS-BD": ("Conexion a base de datos desde usuarios", "lateral"),
+    "JKS-MOV-LATERAL": ("Conexión SMB entre servidores internos", "lateral"),
+    "JKS-BD": ("Conexión a base de datos desde usuarios", "lateral"),
     "JKS-BEACON": ("Conexiones repetidas al mismo destino externo", "volumen"),
 }
 
@@ -286,3 +286,157 @@ def tz_from_offset(offset: str) -> timezone:
         return timezone(signo * timedelta(hours=horas, minutes=minutos))
     except (ValueError, IndexError):
         return UTC
+
+
+# ---------------------------------------------------------------------------
+# Informe en Markdown
+# ---------------------------------------------------------------------------
+def _numero(valor: Any) -> str:
+    """Formato numerico espanol: punto para los miles, coma para los decimales."""
+    if isinstance(valor, bool):
+        return "sí" if valor else "no"
+    if isinstance(valor, float):
+        if valor == int(valor):
+            return f"{int(valor):,}".replace(",", ".")
+        return f"{valor:,.1f}".replace(",", "\u0001").replace(".", ",").replace("\u0001", ".")
+    if isinstance(valor, int):
+        return f"{valor:,}".replace(",", ".")
+    return str(valor)
+
+
+def _markdown_tabla(cabeceras: list[str], filas: list[list[Any]]) -> list[str]:
+    lineas = ["| " + " | ".join(cabeceras) + " |",
+              "|" + "|".join("---" for _ in cabeceras) + "|"]
+    for fila in filas:
+        celdas = [str(celda).replace("|", "/") for celda in fila]
+        lineas.append("| " + " | ".join(celdas) + " |")
+    return lineas
+
+
+def render_markdown(resultado: dict[str, Any], nombre: str = "", generado: str = "") -> str:
+    """Genera el informe de conciliacion en Markdown, listo para pegar."""
+    resumen = resultado.get("resumen", {})
+    lineas: list[str] = ["# Conciliación entre Snort y LogScope", ""]
+
+    if nombre:
+        lineas += [f"**Caso:** {nombre}"]
+    if resultado.get("fichero"):
+        lineas += [f"**Log del IDS:** `{resultado['fichero']}` (formato `{resultado.get('formato', '-')}`)"]
+    if generado:
+        lineas += [f"**Generado:** {generado}"]
+    lineas += [""]
+
+    total = resumen.get("combinaciones_ids", 0)
+    concordantes = resumen.get("concordantes", 0)
+    porcentaje = (resumen.get("tasa_concordancia") or 0) * 100
+    delta = resumen.get("delta_maximo")
+    lineas += ["## Resumen", ""]
+    lineas += _markdown_tabla(
+        ["Métrica", "Valor"],
+        [
+            ["Combinaciones detectadas por el IDS", _numero(total)],
+            [
+                "Concordantes con el análisis del registro",
+                f"{_numero(concordantes)} ({_numero(porcentaje)} %)",
+            ],
+            [
+                "Firmas del IDS concordantes",
+                f"{_numero(resumen.get('firmas_concordantes', 0))} "
+                f"de {_numero(resumen.get('firmas_ids', 0))}",
+            ],
+            [
+                "Desfase temporal máximo",
+                "n/d" if delta is None else f"{_numero(delta)} s",
+            ],
+            ["Alertas totales del IDS", _numero(resumen.get("alertas_ids", 0))],
+            [
+                "Anomalías detectadas solo en el registro",
+                len(resultado.get("anomalias_solo_logscope", [])),
+            ],
+        ],
+    )
+    lineas.append("")
+
+    firmas = resultado.get("por_firma", [])
+    if firmas:
+        lineas += ["## Concordancia por firma", ""]
+        lineas += _markdown_tabla(
+            ["Firma", "Comportamiento", "Criterio", "Combinaciones", "Concordantes", "Alertas", "Estado"],
+            [
+                [
+                    f["firma"],
+                    f.get("nombre", ""),
+                    f.get("criterio", ""),
+                    _numero(f["combinaciones"]),
+                    _numero(f["concordantes"]),
+                    _numero(f["alertas"]),
+                    f["estado"],
+                ]
+                for f in firmas
+            ],
+        )
+        lineas.append("")
+
+    detalle = resultado.get("detalle", [])
+    if detalle:
+        lineas += ["## Detalle por combinación", ""]
+        lineas += _markdown_tabla(
+            [
+                "Firma",
+                "Origen",
+                "Destino",
+                "1ª detección (IDS)",
+                "Evento (registro)",
+                "Instante (registro)",
+                "Δ",
+                "Estado",
+            ],
+            [
+                [
+                    d["firma"],
+                    d["origen"],
+                    d["destino"],
+                    d.get("primera_deteccion_ids", ""),
+                    d.get("evento_log") or "-",
+                    (d.get("instante_log") or "").replace("T", " "),
+                    "-" if d.get("delta_segundos") is None else f"{d['delta_segundos']} s",
+                    d["estado"],
+                ]
+                for d in detalle
+            ],
+        )
+        lineas.append("")
+
+    solo = resultado.get("anomalias_solo_logscope", [])
+    if solo:
+        lineas += ["## Comportamientos visibles solo en el registro", ""]
+        lineas += _markdown_tabla(
+            ["Evento", "Origen", "Destino", "Bytes", "Ratio sobre el p95"],
+            [
+                [
+                    o["event_id"],
+                    o["src"],
+                    o["dst"],
+                    _numero(o.get("bytes_out", 0)),
+                    _numero(o.get("ratio_vs_p95", 0)),
+                ]
+                for o in solo
+            ],
+        )
+        lineas.append("")
+
+    lineas += [
+        "## Alcance de la validación",
+        "",
+        "La concordancia entre ambos instrumentos acredita la coherencia interna de dos "
+        "metodologías de análisis aplicadas al mismo material —el emparejamiento de firmas "
+        "sobre paquetes del IDS y el cálculo determinista sobre el registro—, y no una "
+        "confirmación independiente del hecho: el origen de los datos es común.",
+        "",
+        "La validación tampoco es simétrica: el IDS coincide en todo lo que ocurre en la red, "
+        "pero no puede ver los hallazgos de registro —flujos imposibles, direcciones sin "
+        "activo asociado, correlaciones no resolubles del SIEM o saltos sin evidencia entre "
+        "hosts—, que son precisamente los que aporta el análisis del registro.",
+        "",
+    ]
+    return "\n".join(lineas)

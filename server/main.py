@@ -37,6 +37,7 @@ from analysis import (
     hour_histogram,
     parse_ids,
     reconcile,
+    render_markdown,
     timeline_histogram,
     tz_from_offset,
 )
@@ -1056,6 +1057,29 @@ async def api_concordance(analysis_id: str) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+@app.get("/api/analysis/{analysis_id}/concordance.md")
+async def api_concordance_markdown(analysis_id: str) -> PlainTextResponse:
+    """Informe de conciliacion en Markdown, listo para pegar en el documento."""
+    root = workspace_path(analysis_id)
+    path = root / "analysis" / "concordance.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Todavia no hay ninguna conciliacion")
+    resultado = json.loads(path.read_text(encoding="utf-8"))
+    meta = load_meta(analysis_id)
+    texto = render_markdown(
+        resultado,
+        nombre=meta.get("name", ""),
+        generado=resultado.get("generado", ""),
+    )
+    return PlainTextResponse(
+        texto,
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{analysis_id}-conciliacion.md"',
+        },
+    )
+
+
 @app.post("/api/analysis/{analysis_id}/concordance")
 async def api_concordance_upload(analysis_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
     """Cruza un log de alertas de IDS con el analisis de este caso.
@@ -1090,7 +1114,7 @@ async def api_concordance_upload(analysis_id: str, file: UploadFile = File(...))
     resultado["ok"] = True
     resultado["formato"] = formato
     resultado["fichero"] = file.filename or ""
-    resultado["generado"] = _now()
+    resultado["generado"] = datetime.now(tz).isoformat(timespec="seconds")
 
     destino = root / "analysis" / "concordance.json"
     destino.parent.mkdir(parents=True, exist_ok=True)
