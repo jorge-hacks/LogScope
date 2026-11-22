@@ -404,6 +404,27 @@ async def api_upload(files: list[UploadFile] = File(...), name: str = Form("")) 
 # ---------------------------------------------------------------------------
 # API - consulta
 # ---------------------------------------------------------------------------
+@app.delete("/api/analysis/{analysis_id}")
+async def api_delete_analysis(analysis_id: str) -> dict[str, Any]:
+    """Elimina por completo un analisis: logs, metricas e informe."""
+    root = workspace_path(analysis_id)
+    if not root.exists():
+        raise HTTPException(status_code=404, detail="Analisis no encontrado")
+    if not root.is_dir() or root.parent != settings.workspaces_dir:
+        raise HTTPException(status_code=400, detail="Ruta de analisis no valida")
+
+    run = RUNS.pop(analysis_id, None)
+    if run and run.task and not run.task.done():
+        run.task.cancel()
+
+    try:
+        shutil.rmtree(root)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"No se pudo eliminar: {exc}") from exc
+
+    return {"ok": True, "deleted": analysis_id}
+
+
 @app.get("/api/analysis/{analysis_id}")
 async def api_analysis(analysis_id: str) -> dict[str, Any]:
     root = workspace_path(analysis_id)

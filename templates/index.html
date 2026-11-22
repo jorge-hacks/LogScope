@@ -62,18 +62,22 @@
     </div>
     <div id="analyses-list">
       {% for item in analyses %}
-      <a class="analysis-card" href="/analysis/{{ item.id }}">
-        <div>
-          <div style="font-weight:600">{{ item.name }}</div>
-          <div class="meta">
-            <span>{{ item.events }} eventos</span>
-            <span>{{ item.files }} ficheros</span>
-            <span>{{ item.created_at[:16].replace('T', ' ') }}</span>
-            {% if item.model %}<span class="mono">{{ item.model }}</span>{% endif %}
+      <div class="analysis-row">
+        <a class="analysis-card" href="/analysis/{{ item.id }}">
+          <div>
+            <div style="font-weight:600">{{ item.name }}</div>
+            <div class="meta">
+              <span>{{ item.events }} eventos</span>
+              <span>{{ item.files }} ficheros</span>
+              <span>{{ item.created_at[:16].replace('T', ' ') }}</span>
+              {% if item.model %}<span class="mono">{{ item.model }}</span>{% endif %}
+            </div>
           </div>
-        </div>
-        <span class="badge {{ item.severity }}">{{ item.status }}</span>
-      </a>
+          <span class="badge {{ item.severity }}">{{ item.status }}</span>
+        </a>
+        <button class="icon-btn" data-delete="{{ item.id }}"
+                data-name="{{ item.name }}" title="Eliminar {{ item.name }}">&times;</button>
+      </div>
       {% else %}
       <div class="empty">
         Todavia no hay analisis.<br>Sube un conjunto de logs para empezar.

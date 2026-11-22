@@ -138,6 +138,38 @@ function wire() {
       if ([...select.options].some((o) => o.value === preset.model)) select.value = preset.model;
     }
   });
+
+  // Eliminar un analisis desde la lista.
+  document.querySelectorAll('[data-delete]').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const id = button.dataset.delete;
+      const name = button.dataset.name || id;
+      const confirmado = window.confirm(
+        `¿Eliminar el análisis "${name}"?\n\n` +
+        `Se borrarán de forma permanente los logs cargados, las métricas, ` +
+        `el informe y los archivos exportados.`
+      );
+      if (!confirmado) return;
+      button.disabled = true;
+      try {
+        await LS.api(`/api/analysis/${id}`, { method: 'DELETE' });
+        button.closest('.analysis-row')?.remove();
+        const restante = document.querySelectorAll('.analysis-row').length;
+        if (!restante) {
+          const lista = document.getElementById('analyses-list');
+          if (lista) {
+            lista.innerHTML =
+              '<div class="empty">Todavia no hay analisis.<br>Sube un conjunto de logs para empezar.</div>';
+          }
+        }
+      } catch (err) {
+        button.disabled = false;
+        window.alert(`No se pudo eliminar: ${err.message}`);
+      }
+    });
+  });
 }
 
 loadCatalog().then(wire);

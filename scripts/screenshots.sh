@@ -19,9 +19,32 @@ command -v "$BROWSER" >/dev/null || { echo "No se encuentra chromium" >&2; exit 
 if [ $# -ge 1 ]; then
   AID="$1"
 else
-  AID=$(ls -t "$ROOT/workspaces" 2>/dev/null | head -1 || true)
-  if [ -z "$AID" ] || [ ! -f "$ROOT/workspaces/$AID/report/report.json" ]; then
-    echo "No hay ningun analisis con informe. Pasa el id como argumento." >&2
+  # Por defecto se captura SIEMPRE el analisis de demostracion: las capturas
+  # del README son publicas y no deben contener datos de un caso real.
+  AID=$(python3 - "$ROOT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]) / "workspaces"
+candidatos = []
+for directorio in sorted(root.iterdir(), reverse=True):
+    meta = directorio / "analysis.json"
+    if not meta.exists():
+        continue
+    try:
+        datos = json.loads(meta.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        continue
+    if datos.get("name", "").lower().startswith("demo"):
+        candidatos.append(directorio.name)
+print(candidatos[0] if candidatos else "")
+PY
+)
+  if [ -z "$AID" ]; then
+    echo "No hay ningun analisis de demostracion (nombre iniciado por 'Demo')." >&2
+    echo "Genera el dataset de demo y subelo, o pasa el id como argumento:" >&2
+    echo "  python scripts/demo_dataset.py --output /tmp/demo_logs" >&2
     exit 1
   fi
 fi

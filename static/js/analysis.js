@@ -480,6 +480,27 @@ function wire() {
   document.getElementById('chat-text').addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) sendChat();
   });
+
+  const deleteButton = document.getElementById('delete-btn');
+  if (deleteButton) {
+    deleteButton.addEventListener('click', async () => {
+      const name = document.querySelector('h1')?.textContent?.trim() || analysisId;
+      const confirmado = window.confirm(
+        `¿Eliminar el análisis "${name}"?\n\n` +
+        `Se borrarán de forma permanente los logs cargados, las métricas, ` +
+        `el informe y los archivos exportados. Esta acción no se puede deshacer.`
+      );
+      if (!confirmado) return;
+      deleteButton.disabled = true;
+      try {
+        await LS.api(`/api/analysis/${analysisId}`, { method: 'DELETE' });
+        window.location.href = '/';
+      } catch (err) {
+        deleteButton.disabled = false;
+        window.alert(`No se pudo eliminar: ${err.message}`);
+      }
+    });
+  }
 }
 
 boot().catch((err) => {
