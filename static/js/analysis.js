@@ -17,6 +17,7 @@ async function boot() {
   await loadTimeline();
   await loadEvents(true);
   await loadConcordance();
+  await loadVerificacion();
   wire();
   wireConcordance();
 }
@@ -195,6 +196,79 @@ function renderState(data) {
     banner.innerHTML = `Informe generado${modelo}. Severidad global `
       + `<b>${LS.escape(meta.severity || 'INFO')}</b>.`;
   }
+}
+
+/* ------------------------------------------------------------- verificacion */
+const VEREDICTO_CLASE = {
+  'VERDADERO POSITIVO': 'ok',
+  'VERDADERO POSITIVO CON EVIDENCIA DEFICIENTE': 'pending',
+  'FALSO POSITIVO': 'failed',
+};
+
+async function loadVerificacion() {
+  let data;
+  try {
+    data = await LS.api(`/api/analysis/${analysisId}/verification`);
+  } catch (err) {
+    return;
+  }
+  renderVerificacion(data);
+}
+
+function renderVerificacion(data) {
+  const resumen = data.alertas || {};
+  document.getElementById('c-verificacion').textContent = resumen.falsos_positivos || 0;
+
+  const tarjetas = [
+    { k: 'Alertas analizadas', v: resumen.total || 0, n: 'del SIEM' },
+    { k: 'Verdaderos positivos', v: resumen.verdaderos_positivos || 0, n: 'con señal y evidencia válida' },
+    {
+      k: 'Con evidencia deficiente',
+      v: resumen.verdaderos_con_evidencia_deficiente || 0,
+      n: 'verdaderas, pero mal correlacionadas',
+    },
+    { k: 'Falsos positivos', v: resumen.falsos_positivos || 0, n: 'sin señal que las respalde' },
+  ];
+  document.getElementById('ver-stats').innerHTML = tarjetas.map((t) => `
+    <div class="stat">
+      <div class="stat-label">${LS.escape(t.k)}</div>
+      <div class="stat-value">${LS.escape(String(t.v))}</div>
+      <div class="stat-note">${LS.escape(t.n)}</div>
+    </div>`).join('');
+
+  const cuerpo = document.querySelector('#ver-table tbody');
+  cuerpo.innerHTML = (data.detalle || []).map((f) => {
+    const clase = VEREDICTO_CLASE[f.veredicto] || 'info';
+    let refs = `${f.referencias_validas.length} válida(s)`;
+    if (f.referencias_no_resolubles.length) {
+      refs += ` · ${f.referencias_no_resolubles.length} sin resolver`;
+    }
+    if (f.referencias_benignas.length) {
+      refs += ` · ${f.referencias_benignas.length} benigna(s)`;
+    }
+    return `<tr>
+      <td class="mono">${LS.escape(f.alerta)}</td>
+      <td><span class="badge ${clase}">${LS.escape(f.veredicto)}</span></td>
+      <td class="mono">${LS.escape(f.severidad_declarada)}</td>
+      <td class="small">${f.senal ? `<span class="tag evidence">${LS.escape(f.senal_tipo)}</span> ${LS.escape(f.senal_evento)}` : '<span class="tag">ninguna</span>'}</td>
+      <td class="small mono">${LS.escape(refs)}</td>
+      <td class="small muted">${LS.escape((f.motivos || []).join('; ') || '—')}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('ver-verdict-sub').textContent =
+    `${resumen.tasa_verificacion !== undefined ? Math.round(resumen.tasa_verificacion * 100) : 0} % de las alertas tienen respaldo en los registros`;
+
+  const fn = data.falsos_negativos || [];
+  document.querySelector('#ver-fn tbody').innerHTML = fn.map((f) => `
+    <tr>
+      <td class="mono">${LS.escape(f.evento)}</td>
+      <td class="ts">${LS.escape((f.instante || '').replace('T', ' '))}</td>
+      <td><span class="badge ${f.severidad === 'CRITICAL' ? 'CRITICAL' : (f.severidad === 'HIGH' ? 'HIGH' : 'INFO')}">${LS.escape(f.severidad)}</span></td>
+      <td class="small">${LS.escape(f.tipo)}</td>
+      <td class="small muted">${LS.escape(f.detalle || '')}</td>
+      <td class="small muted">${LS.escape(f.motivo || '')}</td>
+    </tr>`).join('');
+  document.getElementById('ver-fn-sub').textContent = `${fn.length} hechos sin alerta`;
 }
 
 /* ------------------------------------------------------------ conciliacion */

@@ -40,6 +40,7 @@ from analysis import (
     render_markdown,
     timeline_histogram,
     tz_from_offset,
+    verify_alerts,
 )
 from exporter import export_findings_csv, export_pdf, export_report_markdown
 from ingest import ingest_paths, write_events
@@ -1043,6 +1044,26 @@ async def api_chat(analysis_id: str, payload: dict[str, Any]) -> StreamingRespon
             yield f"event: error\ndata: {json.dumps({'error': str(exc)})}\n\n"
 
     return StreamingResponse(generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/api/analysis/{analysis_id}/verification")
+async def api_verification(analysis_id: str) -> dict[str, Any]:
+    """Verificacion de las alertas: falsos positivos y falsos negativos."""
+    root = workspace_path(analysis_id)
+    if not root.exists():
+        raise HTTPException(status_code=404, detail="Analisis no encontrado")
+
+    from ingest import read_events
+
+    events = read_events(root / "normalized" / "events.jsonl")
+    metrics_path = root / "analysis" / "metrics.json"
+    integrity_path = root / "analysis" / "integrity.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.exists() else {}
+    integrity = json.loads(integrity_path.read_text(encoding="utf-8")) if integrity_path.exists() else {}
+
+    resultado = verify_alerts(events, metrics, integrity)
+    resultado["ok"] = True
+    return resultado
 
 
 # ---------------------------------------------------------------------------

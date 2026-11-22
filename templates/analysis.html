@@ -55,6 +55,7 @@
   <button class="tab" data-tab="siem">Reglas SIEM <span class="count" id="c-siem">0</span></button>
   <button class="tab" data-tab="iocs">IOCs <span class="count" id="c-iocs">0</span></button>
   <button class="tab" data-tab="gaps">Telemetria</button>
+  <button class="tab" data-tab="verificacion">Verificación de alertas <span class="count" id="c-verificacion">0</span></button>
   <button class="tab" data-tab="concordance">Conciliación IDS <span class="count" id="c-concordance">0</span></button>
   <button class="tab" data-tab="chat">Chat</button>
 </div>
@@ -189,6 +190,58 @@
   <div class="card">
     <div class="card-head"><h2>Resumen del analisis</h2></div>
     <div id="summary-text" class="md-report"><div class="empty">Sin resumen.</div></div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- verificacion -->
+<div class="tab-panel" id="panel-verificacion">
+  <div class="card">
+    <div class="card-head">
+      <h2>Verificación de las alertas del SIEM</h2>
+      <span class="card-sub">cada alerta contrastada con los registros originales</span>
+    </div>
+    <p class="small muted">
+      Cada alerta se somete a dos comprobaciones independientes: si existe una <b>señal
+      técnica</b> que la respalde dentro de su ventana temporal, y si la <b>evidencia que
+      la propia alerta declara</b> se puede resolver en los registros. Una alerta sin señal
+      es un falso positivo; una alerta con señal pero con referencias rotas es verdadera,
+      aunque mal correlacionada.
+    </p>
+    <div class="grid grid-4 mt-2" id="ver-stats"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Veredicto por alerta</h2>
+      <span class="card-sub" id="ver-verdict-sub"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="ver-table">
+        <thead><tr>
+          <th>Alerta</th><th>Veredicto</th><th>Severidad</th><th>Señal correlacionada</th>
+          <th>Referencias</th><th>Motivo</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Falsos negativos</h2>
+      <span class="card-sub" id="ver-fn-sub"></span>
+    </div>
+    <p class="small muted">
+      Hechos relevantes que no dispararon ninguna alerta: eventos de gravedad alta o
+      crítica que ninguna alerta menciona, y conexiones bloqueadas en el perímetro que
+      tampoco dejaron rastro en el SIEM.
+    </p>
+    <div class="table-wrap" style="max-height:460px;overflow-y:auto">
+      <table id="ver-fn">
+        <thead><tr><th>Evento</th><th>Instante</th><th>Severidad</th><th>Tipo</th><th>Detalle</th><th>Motivo</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
