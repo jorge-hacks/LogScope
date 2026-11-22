@@ -39,6 +39,7 @@ def build_traceability(
     integrity: dict[str, Any],
     report: dict[str, Any] | None = None,
     falsos_negativos: list[dict[str, Any]] | None = None,
+    veredictos: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Construye la matriz de trazabilidad alerta -> evidencia -> hallazgo."""
     por_id = {e["event_id"]: e for e in events}
@@ -58,6 +59,9 @@ def build_traceability(
         benignas.setdefault(item["alert_id"], []).append(item["reference"])
     for item in integrity.get("siem_correlation", {}).get("missing_references", []):
         inexistentes.setdefault(item["alert_id"], []).append(item["reference"])
+
+    # --- veredicto de cada alerta, si se calculo la verificacion --------------
+    veredictos = veredictos or {}
 
     # --- hechos no alertados, para buscar los cercanos a cada alerta ---------
     no_alertados = falsos_negativos or []
@@ -135,9 +139,13 @@ def build_traceability(
                     )
             cercanos.sort(key=lambda c: c["minutos"])
 
+        veredicto = veredictos.get(identificador, {})
         filas.append(
             {
                 "alerta": identificador,
+                "veredicto": veredicto.get("veredicto", ""),
+                "motivos": veredicto.get("motivos", []),
+                "senal": veredicto.get("senal"),
                 "instante": alerta.get("iso_utc", ""),
                 "severidad": alerta.get("severity", ""),
                 "tactica": raw.get("tactic", ""),
@@ -172,6 +180,8 @@ def build_traceability(
             "alertas": len(filas),
             "alertas_con_hallazgo": sum(1 for f in filas if f["hallazgos"]),
             "alertas_sin_hallazgo": sum(1 for f in filas if not f["hallazgos"]),
+            "falsos_positivos": sum(1 for f in filas if f["veredicto"] == "FALSO POSITIVO"),
+            "verdaderos_positivos": sum(1 for f in filas if f["veredicto"].startswith("VERDADERO")),
             "hallazgos": len(por_hallazgo),
             "hallazgos_sin_alerta": sum(
                 1 for h in hallazgos if h.get("id") and h["id"] not in por_hallazgo

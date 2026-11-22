@@ -1086,12 +1086,14 @@ async def api_traceability(analysis_id: str) -> dict[str, Any]:
     report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else {}
 
     verificacion = verify_alerts(events, metrics, integrity)
+    veredictos = {f["alerta"]: f for f in verificacion.get("detalle", [])}
     resultado = build_traceability(
         events,
         metrics,
         integrity,
         report=report,
         falsos_negativos=verificacion.get("falsos_negativos", []),
+        veredictos=veredictos,
     )
     resultado["ok"] = True
     return resultado

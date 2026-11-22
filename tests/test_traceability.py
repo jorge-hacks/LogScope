@@ -123,3 +123,22 @@ def test_el_resumen_cuadra():
     assert resumen["alertas_con_hallazgo"] == 1
     assert resumen["alertas_sin_hallazgo"] == 1
     assert resumen["hallazgos"] == 1
+
+
+def test_el_veredicto_de_verificacion_se_incorpora_a_cada_alerta():
+    """La matriz debe decir si cada alerta es falsa o verdadera."""
+    eventos = [_alerta("SIEM-0009", ["SYS-00010"])]
+    veredictos = {
+        "SIEM-0009": {
+            "veredicto": "FALSO POSITIVO",
+            "motivos": ["no hay ninguna senal tecnica correlacionada en su ventana"],
+            "senal": False,
+        }
+    }
+    resultado = build_traceability(eventos, {}, _integridad(), veredictos=veredictos)
+    fila = resultado["alertas"][0]
+    assert fila["veredicto"] == "FALSO POSITIVO"
+    assert fila["senal"] is False
+    assert fila["motivos"]
+    assert resultado["resumen"]["falsos_positivos"] == 1
+    assert resultado["resumen"]["verdaderos_positivos"] == 0

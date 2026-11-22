@@ -216,9 +216,9 @@ function renderTrazabilidad(data) {
 
   const tarjetas = [
     { k: 'Alertas del SIEM', v: resumen.alertas || 0, n: `${resumen.alertas_sin_hallazgo || 0} sin hallazgo asociado` },
+    { k: 'Verdaderas', v: resumen.verdaderos_positivos || 0, n: 'con señal que las respalda' },
+    { k: 'Falsos positivos', v: resumen.falsos_positivos || 0, n: 'sin señal en los registros' },
     { k: 'Hallazgos', v: resumen.hallazgos || 0, n: `${resumen.hallazgos_sin_alerta || 0} sin alerta que los sustente` },
-    { k: 'Alertas trazables', v: resumen.alertas_con_hallazgo || 0, n: 'con al menos un hallazgo que las recoge' },
-    { k: 'Ventana analizada', v: '±10 min', n: 'hechos no alertados cercanos' },
   ];
   document.getElementById('tra-stats').innerHTML = tarjetas.map((t) => `
     <div class="stat">
@@ -241,11 +241,22 @@ function renderTrazabilidad(data) {
     const noal = (f.hechos_no_alertados || []).map((c) => `
       <span class="tag">${LS.escape(c.evento)}</span>
       <span class="small muted">+${c.minutos} min · ${LS.escape(c.tipo)}</span>`).join('<br>') || '<span class="small muted">—</span>';
+    const veredicto = f.veredicto || '';
+    const clase = { 'VERDADERO POSITIVO': 'ok', 'VERDADERO POSITIVO CON EVIDENCIA DEFICIENTE': 'pending', 'FALSO POSITIVO': 'failed' }[veredicto] || 'info';
+    const etiqueta = veredicto ? `<span class="badge ${clase}">${LS.escape(veredicto)}</span>` : '<span class="small muted">—</span>';
+    const motivos = (f.motivos || []).length
+      ? `<div class="small muted" style="margin-top:3px">${LS.escape((f.motivos || []).join('; '))}</div>`
+      : '';
+    const noalMarcado = (f.hechos_no_alertados || []).map((c) => `
+      <span class="badge failed" style="margin-right:4px">falso negativo</span>
+      <span class="tag">${LS.escape(c.evento)}</span>
+      <span class="small muted">+${c.minutos} min · ${LS.escape(c.tipo)}</span>`).join('<br>') || '<span class="small muted">—</span>';
     return `<tr>
       <td class="mono">${LS.escape(f.alerta)}<div class="small muted">${LS.escape(f.tecnica || '')}</div></td>
+      <td class="small">${etiqueta}${motivos}</td>
       <td class="small">${refs}</td>
       <td class="small">${hall}</td>
-      <td class="small">${noal}</td>
+      <td class="small">${noalMarcado}</td>
     </tr>`;
   }).join('');
 
