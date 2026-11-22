@@ -33,6 +33,7 @@ from pydantic import ValidationError
 
 from analysis import (
     audit_integrity,
+    build_traceability,
     compute_metrics,
     hour_histogram,
     parse_ids,
@@ -1062,6 +1063,36 @@ async def api_verification(analysis_id: str) -> dict[str, Any]:
     integrity = json.loads(integrity_path.read_text(encoding="utf-8")) if integrity_path.exists() else {}
 
     resultado = verify_alerts(events, metrics, integrity)
+    resultado["ok"] = True
+    return resultado
+
+
+@app.get("/api/analysis/{analysis_id}/traceability")
+async def api_traceability(analysis_id: str) -> dict[str, Any]:
+    """Matriz de trazabilidad: alerta -> evidencia -> hallazgo."""
+    root = workspace_path(analysis_id)
+    if not root.exists():
+        raise HTTPException(status_code=404, detail="Analisis no encontrado")
+
+    from ingest import read_events
+
+    events = read_events(root / "normalized" / "events.jsonl")
+    metrics_path = root / "analysis" / "metrics.json"
+    integrity_path = root / "analysis" / "integrity.json"
+    metrics = json.loads(metrics_path.read_text(encoding="utf-8")) if metrics_path.exists() else {}
+    integrity = json.loads(integrity_path.read_text(encoding="utf-8")) if integrity_path.exists() else {}
+
+    report_path = root / "report" / "report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else {}
+
+    verificacion = verify_alerts(events, metrics, integrity)
+    resultado = build_traceability(
+        events,
+        metrics,
+        integrity,
+        report=report,
+        falsos_negativos=verificacion.get("falsos_negativos", []),
+    )
     resultado["ok"] = True
     return resultado
 

@@ -18,6 +18,7 @@ async function boot() {
   await loadEvents(true);
   await loadConcordance();
   await loadVerificacion();
+  await loadTrazabilidad();
   wire();
   wireConcordance();
 }
@@ -196,6 +197,65 @@ function renderState(data) {
     banner.innerHTML = `Informe generado${modelo}. Severidad global `
       + `<b>${LS.escape(meta.severity || 'INFO')}</b>.`;
   }
+}
+
+/* ------------------------------------------------------------- trazabilidad */
+async function loadTrazabilidad() {
+  let data;
+  try {
+    data = await LS.api(`/api/analysis/${analysisId}/traceability`);
+  } catch (err) {
+    return;
+  }
+  renderTrazabilidad(data);
+}
+
+function renderTrazabilidad(data) {
+  const resumen = data.resumen || {};
+  document.getElementById('c-trazabilidad').textContent = resumen.alertas_con_hallazgo || 0;
+
+  const tarjetas = [
+    { k: 'Alertas del SIEM', v: resumen.alertas || 0, n: `${resumen.alertas_sin_hallazgo || 0} sin hallazgo asociado` },
+    { k: 'Hallazgos', v: resumen.hallazgos || 0, n: `${resumen.hallazgos_sin_alerta || 0} sin alerta que los sustente` },
+    { k: 'Alertas trazables', v: resumen.alertas_con_hallazgo || 0, n: 'con al menos un hallazgo que las recoge' },
+    { k: 'Ventana analizada', v: '±10 min', n: 'hechos no alertados cercanos' },
+  ];
+  document.getElementById('tra-stats').innerHTML = tarjetas.map((t) => `
+    <div class="stat">
+      <div class="stat-label">${LS.escape(t.k)}</div>
+      <div class="stat-value">${LS.escape(String(t.v))}</div>
+      <div class="stat-note">${LS.escape(t.n)}</div>
+    </div>`).join('');
+
+  const estadoClase = {
+    'válida': 'ok', 'evento benigno': 'pending', 'no resoluble': 'failed', 'inexistente': 'failed', 'no encontrada': 'failed',
+  };
+  const cuerpo = document.querySelector('#tra-table tbody');
+  cuerpo.innerHTML = (data.alertas || []).map((f) => {
+    const refs = (f.referencias || []).map((r) => `
+      <span class="tag ${estadoClase[r.estado] || 'info'}" title="${LS.escape(r.tipo || '')} ${LS.escape(r.instante || '')}">${LS.escape(r.referencia)}</span>
+      <span class="small muted">${LS.escape(r.estado)}</span>`).join('<br>');
+    const hall = (f.hallazgos || []).map((h) => `
+      <span class="tag evidence">${LS.escape(h.id)}</span>
+      <span class="small muted">${LS.escape(h.por_que)}</span>`).join('<br>') || '<span class="small muted">—</span>';
+    const noal = (f.hechos_no_alertados || []).map((c) => `
+      <span class="tag">${LS.escape(c.evento)}</span>
+      <span class="small muted">+${c.minutos} min · ${LS.escape(c.tipo)}</span>`).join('<br>') || '<span class="small muted">—</span>';
+    return `<tr>
+      <td class="mono">${LS.escape(f.alerta)}<div class="small muted">${LS.escape(f.tecnica || '')}</div></td>
+      <td class="small">${refs}</td>
+      <td class="small">${hall}</td>
+      <td class="small">${noal}</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelector('#tra-hallazgos tbody').innerHTML = (data.hallazgos || []).map((h) => `
+    <tr>
+      <td class="mono">${LS.escape(h.id)}</td>
+      <td><span class="badge ${h.severidad === 'CRITICAL' ? 'CRITICAL' : (h.severidad === 'HIGH' ? 'HIGH' : (h.severidad === 'MEDIUM' ? 'MEDIUM' : 'INFO'))}">${LS.escape(h.severidad)}</span></td>
+      <td class="small">${LS.escape(h.titulo)}</td>
+      <td class="small mono">${(h.alertas || []).map(LS.escape).join(', ') || '—'}</td>
+    </tr>`).join('');
 }
 
 /* ------------------------------------------------------------- verificacion */

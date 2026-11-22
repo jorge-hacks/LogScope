@@ -56,6 +56,7 @@
   <button class="tab" data-tab="iocs">IOCs <span class="count" id="c-iocs">0</span></button>
   <button class="tab" data-tab="gaps">Telemetria</button>
   <button class="tab" data-tab="verificacion">Verificación de alertas <span class="count" id="c-verificacion">0</span></button>
+  <button class="tab" data-tab="trazabilidad">Trazabilidad <span class="count" id="c-trazabilidad">0</span></button>
   <button class="tab" data-tab="concordance">Conciliación IDS <span class="count" id="c-concordance">0</span></button>
   <button class="tab" data-tab="chat">Chat</button>
 </div>
@@ -190,6 +191,46 @@
   <div class="card">
     <div class="card-head"><h2>Resumen del analisis</h2></div>
     <div id="summary-text" class="md-report"><div class="empty">Sin resumen.</div></div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- trazabilidad -->
+<div class="tab-panel" id="panel-trazabilidad">
+  <div class="card">
+    <div class="card-head">
+      <h2>Trazabilidad: de la alerta al hallazgo</h2>
+      <span class="card-sub">cada alerta, su evidencia, sus conclusiones y lo que no se alertó</span>
+    </div>
+    <p class="small muted">
+      La cadena que sostiene el informe es verificable: una alerta y un hallazgo
+      hablan del mismo hecho porque <b>citan los mismos identificadores de evento</b>.
+      La última columna muestra lo que ocurrió en la ventana de cada alerta y que
+      ninguna alerta cubrió.
+    </p>
+    <div class="grid grid-4 mt-2" id="tra-stats"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Matriz de trazabilidad</h2></div>
+    <div class="table-wrap" style="max-height:620px;overflow-y:auto">
+      <table id="tra-table">
+        <thead><tr>
+          <th>Alerta</th><th>Evidencia declarada</th><th>Hallazgos</th>
+          <th>Hechos no alertados en su ventana</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Hallazgos y las alertas que los sustentan</h2></div>
+    <div class="table-wrap">
+      <table id="tra-hallazgos">
+        <thead><tr><th>Hallazgo</th><th>Severidad</th><th>Título</th><th>Alertas que lo sustentan</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
