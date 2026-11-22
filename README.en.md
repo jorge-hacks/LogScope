@@ -11,7 +11,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-2DD4BF?style=flat-square&logo=python&logoColor=black)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-7C9CFF?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![opencode](https://img.shields.io/badge/engine-opencode--go-2DD4BF?style=flat-square)](https://opencode.ai)
-[![models](https://img.shields.io/badge/models-33%20opencode--go-7C9CFF?style=flat-square)](https://opencode.ai)
+[![models](https://img.shields.io/badge/models-opencode--go-7C9CFF?style=flat-square)](https://opencode.ai)
 [![tests](https://img.shields.io/badge/tests-61%20passing-34D399?style=flat-square)](https://github.com/)
 [![license](https://img.shields.io/badge/license-MIT-FFD166?style=flat-square)](LICENSE)
 
@@ -107,7 +107,8 @@ filtered to the configured provider. When `opencode-go` rotates its providers
 next month, the dropdown updates itself — **no code change, no redeploy**.
 
 ```
-33 models · 4 free · 11 cheap · 12 mid · 6 premium
+More than 30 `opencode-go` models at the time of writing, 3 of them free.
+The exact count is not hardcoded: it is read from the server every time the app opens.
 ```
 
 ### ✅ Tool-calling is mandatory

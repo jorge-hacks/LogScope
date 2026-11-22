@@ -11,7 +11,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-2DD4BF?style=flat-square&logo=python&logoColor=black)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-7C9CFF?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![opencode](https://img.shields.io/badge/motor-opencode--go-2DD4BF?style=flat-square)](https://opencode.ai)
-[![modelos](https://img.shields.io/badge/modelos-33%20opencode--go-7C9CFF?style=flat-square)](https://opencode.ai)
+[![modelos](https://img.shields.io/badge/modelos-opencode--go-7C9CFF?style=flat-square)](https://opencode.ai)
 [![tests](https://img.shields.io/badge/tests-61%20pasando-34D399?style=flat-square)](https://github.com/)
 [![licencia](https://img.shields.io/badge/licencia-MIT-FFD166?style=flat-square)](LICENSE)
 
@@ -110,7 +110,8 @@ mes que viene, el desplegable se actualiza solo: **sin cambios de código y sin
 re-desplegar**.
 
 ```
-33 modelos · 4 gratis · 11 económicos · 12 medios · 6 premium
+Más de 30 modelos de `opencode-go` en el momento de redactarlo, 3 de ellos gratuitos.
+El número exacto no se fija en el código: se lee del servidor cada vez que se abre la aplicación.
 ```
 
 ### ✅ El tool calling es obligatorio
