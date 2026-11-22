@@ -100,7 +100,7 @@ async function loadEvents(reset) {
   for (const event of data.events) {
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td class="ts">${LS.escape((event.iso_utc || '').replace('T', ' ').replace('+00:00', ''))}</td>
+      <td class="ts">${LS.escape((event.iso_local || event.iso_utc || '').replace('T', ' '))}</td>
       <td><span class="tag">${LS.escape(event.source_type)}</span></td>
       <td class="mono">${LS.escape(event.event_id)}</td>
       <td><span class="badge ${LS.escape(event.severity)}">${LS.escape(event.severity)}</span></td>

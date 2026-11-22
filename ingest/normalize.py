@@ -71,6 +71,22 @@ def _to_int(value: Any) -> int:
         return 0
 
 
+def _momento_local(texto: str) -> datetime | None:
+    """Interpreta la marca temporal conservando su propio desplazamiento.
+
+    Los registros suelen venir en la zona horaria del cliente, no en UTC.
+    Calcular la hora en UTC parte el dia y desplaza el horario nocturno, de
+    modo que el analisis de "fuera de horario" se calcularia sobre la franja
+    equivocada.
+    """
+    if not texto:
+        return None
+    try:
+        return datetime.fromisoformat(texto.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 def _clean(value: Any) -> str:
     if value is None:
         return ""
@@ -141,13 +157,23 @@ def normalize_row(
     if profile.name in {"antivirus", "system"} and src_ip and not dst_ip:
         dst_ip = src_ip
 
+    # La hora y la fecha locales se toman del propio registro, no de UTC:
+    # un log en -03:00 debe analizarse en -03:00.
+    momento = _momento_local(ts)
+    hora_local = momento.hour if momento else -1
+    offset = momento.strftime("%z") if momento else ""
+    if offset:
+        offset = f"{offset[:3]}:{offset[3:]}"
+
     return {
         "ts": ts,
         "ts_epoch": epoch,
         "iso_utc": (
             datetime.fromtimestamp(epoch, tz=UTC).isoformat(timespec="seconds") if epoch else ""
         ),
-        "hour": int(datetime.fromtimestamp(epoch, tz=UTC).hour) if epoch else -1,
+        "iso_local": momento.isoformat(timespec="seconds") if momento else "",
+        "utc_offset": offset,
+        "hour": hora_local,
         "source_file": source_file,
         "source_type": profile.name,
         "source_label": profile.label,

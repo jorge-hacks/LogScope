@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import statistics
 from collections import Counter, defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 OFF_HOURS = range(0, 7)  # 00:00 - 06:59 en hora local del evento
@@ -45,10 +45,37 @@ def _percentile(values: list[float], pct: float) -> float:
     return float(ordered[lower] * (1 - weight) + ordered[upper] * weight)
 
 
-def _iso(epoch: float) -> str:
+def _iso(epoch: float, tz: timezone = UTC) -> str:
     if not epoch:
         return ""
-    return datetime.fromtimestamp(epoch, tz=UTC).isoformat(timespec="seconds")
+    return datetime.fromtimestamp(epoch, tz=tz).isoformat(timespec="seconds")
+
+
+def dominant_tz(events: list[dict[str, Any]]) -> timezone:
+    """Zona horaria mayoritaria de los registros.
+
+    Los logs llegan en la zona del cliente, no en UTC. Sin esta correccion,
+    la franja de "actividad fuera de horario" se calcularia sobre la hora de
+    Londres o de Nueva York y el analisis nocturno saldra desplazado.
+    """
+    counts = Counter(e.get("utc_offset", "") for e in events if e.get("utc_offset"))
+    if not counts:
+        return UTC
+    offset = counts.most_common(1)[0][0]
+    try:
+        signo = -1 if offset.startswith("-") else 1
+        horas = int(offset[1:3])
+        minutos = int(offset[4:6])
+        return timezone(signo * timedelta(hours=horas, minutes=minutos))
+    except (ValueError, IndexError):
+        return UTC
+
+
+def _tz_label(tz: timezone) -> str:
+    total = int(tz.utcoffset(None).total_seconds()) if tz.utcoffset(None) else 0
+    signo = "-" if total < 0 else "+"
+    total = abs(total)
+    return f"{signo}{total // 3600:02d}:{(total % 3600) // 60:02d}"
 
 
 def _robust_threshold(values: list[float]) -> float:
@@ -75,6 +102,7 @@ def compute_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
 
     timestamps = [e["ts_epoch"] for e in events if e["ts_epoch"]]
     start, end = min(timestamps), max(timestamps)
+    tz = dominant_tz(events)
 
     by_source: dict[str, int] = Counter(e["source_type"] for e in events)
     by_severity: dict[str, int] = Counter(e["severity"] for e in events)
@@ -139,8 +167,9 @@ def compute_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "events": len(events),
         "window": {
-            "start": _iso(start),
-            "end": _iso(end),
+            "start": _iso(start, tz),
+            "end": _iso(end, tz),
+            "utc_offset": _tz_label(tz),
             "span_seconds": end - start,
             "span_human": _fmt_duration(end - start),
         },
@@ -173,8 +202,8 @@ def compute_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
         "detection": detection,
         "containment": containment,
         "dwell": {
-            "first_signal": _iso(signals[0]["ts"]) if signals else "",
-            "contained_at": _iso(containment["ts"]) if containment.get("ts") else "",
+            "first_signal": _iso(signals[0]["ts"], tz) if signals else "",
+            "contained_at": _iso(containment["ts"], tz) if containment.get("ts") else "",
             "seconds": dwell_seconds,
             "human": _fmt_duration(dwell_seconds) if dwell_seconds else "",
         },
@@ -406,6 +435,7 @@ def timeline_histogram(events: list[dict[str, Any]], buckets: int = 48) -> list[
     if not stamps:
         return []
     start, end = min(stamps), max(stamps)
+    tz = dominant_tz(events)
     span = max(end - start, 1)
     width = span / buckets
     counts = [0] * buckets
@@ -419,8 +449,8 @@ def timeline_histogram(events: list[dict[str, Any]], buckets: int = 48) -> list[
     return [
         {
             "bucket": index,
-            "start": _iso(start + index * width),
-            "end": _iso(start + (index + 1) * width),
+            "start": _iso(start + index * width, tz),
+            "end": _iso(start + (index + 1) * width, tz),
             "count": counts[index],
             "severities": dict(severities[index]),
         }
